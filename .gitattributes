@@ -1,0 +1,34 @@
+# Git attributes for consistent line endings and diff behavior
+
+# Auto normalize line endings
+* text=auto
+
+# Rust source files
+*.rs text eol=lf
+Cargo.toml text eol=lf
+Cargo.lock text eol=lf
+rustfmt.toml text eol=lf
+
+# Markdown
+*.md text eol=lf
+
+# Shell scripts
+.githooks/* text eol=lf
+*.sh text eol=lf
+
+# YAML
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# JSON
+*.json text eol=lf
+
+# Binary files (don't normalize)
+*.lock binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.zip binary
+*.tar binary
+*.tar.gz binary

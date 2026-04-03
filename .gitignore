@@ -1,0 +1,33 @@
+# Rust / Cargo
+/target/
+**/*.rs.bk
+Cargo.lock
+*.pdb
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.vscode-settings.json
+
+# Node (for PRD docs generation if needed)
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Project-specific
+.cantrik/
+*.cantrik.local.toml

@@ -1,0 +1,15 @@
+[package]
+name = "cantrik-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "cantrik"
+path = "src/main.rs"
+
+[dependencies]
+cantrik-core = { path = "../cantrik-core" }
+clap.workspace = true
+reqwest.workspace = true
+tokio.workspace = true

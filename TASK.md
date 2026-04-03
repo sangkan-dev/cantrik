@@ -99,12 +99,14 @@ default_model = "llama-3.3-70b-versatile"
 
 **Goal:** *Basic REPL* PRD: `ratatui` + `crossterm`, log berpikir, perintah built-in awal.
 
-- [ ] Integrasi `ratatui` + `crossterm`
-- [ ] Render *thinking log* + output streaming (sesuai gaya *Terminal UX* PRD)
-- [ ] Riwayat input + state sesi in-memory
-- [ ] Perintah built-in minimal: `/cost`, `/memory`, `/doctor` (sesuai tabel *Built-in Commands* PRD)
+- [x] Integrasi `ratatui` + `crossterm`
+- [x] Render *thinking log* + output streaming (sesuai gaya *Terminal UX* PRD)
+- [x] Riwayat input + state sesi in-memory
+- [x] Perintah built-in minimal: `/cost`, `/memory`, `/doctor` (sesuai tabel *Built-in Commands* PRD)
 
 **Definition of Done:** REPL bisa sesi percakapan singkat dengan log dan tiga perintah di atas.
+
+**Catatan:** `/cost` dan `/memory` berupa stub/jelasan tier sesuai PRD (pelacakan biaya nyata di Sprint 14+; persistensi memori di Sprint 6–7). `/doctor` memakai `doctor::report_lines` yang sama dengan subcommand `cantrik doctor`.
 
 ---
 

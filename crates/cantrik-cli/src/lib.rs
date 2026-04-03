@@ -2,8 +2,9 @@
 
 mod cli;
 mod commands;
+mod repl;
 
-use std::io::{self, BufRead, IsTerminal, Read, Write};
+use std::io::{self, IsTerminal, Read};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -115,7 +116,7 @@ pub async fn run() -> ExitCode {
             }
 
             if io::stdin().is_terminal() {
-                repl_placeholder().await
+                repl_run(cwd).await
             } else {
                 stdin_pipe_ask(&cwd).await
             }
@@ -174,47 +175,26 @@ async fn stdin_pipe_ask(cwd: &Path) -> ExitCode {
     commands::ask::run(&config, &text).await
 }
 
-async fn repl_placeholder() -> ExitCode {
-    let result = tokio::task::spawn_blocking(repl_sync).await;
-    match result {
-        Ok(code) => code,
-        Err(e) => {
-            eprintln!("REPL task failed: {e}");
+async fn repl_run(cwd: std::path::PathBuf) -> ExitCode {
+    let config = match load_merged_config(&cwd) {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("failed to load config: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let handle = tokio::runtime::Handle::current();
+    match tokio::task::spawn_blocking(move || repl::run_sync(cwd, config, handle)).await {
+        Ok(Ok(())) => ExitCode::SUCCESS,
+        Ok(Err(error)) => {
+            eprintln!("REPL exited with error: {error}");
+            ExitCode::FAILURE
+        }
+        Err(join_error) => {
+            eprintln!("REPL task failed: {join_error}");
             ExitCode::FAILURE
         }
     }
-}
-
-fn repl_sync() -> ExitCode {
-    println!(
-        "Cantrik REPL (placeholder). Type 'exit' or 'quit', or Ctrl+D to leave. Full TUI arrives in Sprint 4."
-    );
-    let stdin = io::stdin();
-    let mut line = String::new();
-    loop {
-        line.clear();
-        print!("cantrik> ");
-        let _ = io::stdout().flush();
-        let n = match stdin.lock().read_line(&mut line) {
-            Ok(n) => n,
-            Err(error) => {
-                eprintln!("failed to read line: {error}");
-                return ExitCode::FAILURE;
-            }
-        };
-        if n == 0 {
-            println!();
-            break;
-        }
-        let trimmed = line.trim();
-        if trimmed.eq_ignore_ascii_case("exit") || trimmed.eq_ignore_ascii_case("quit") {
-            break;
-        }
-        if !trimmed.is_empty() {
-            println!("(REPL placeholder) you said: {trimmed}");
-        }
-    }
-    ExitCode::SUCCESS
 }
 
 #[cfg(test)]

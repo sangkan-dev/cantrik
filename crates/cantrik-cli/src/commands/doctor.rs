@@ -4,18 +4,20 @@ use std::process::ExitCode;
 use cantrik_core::config::{load_merged_config, resolve_config_paths};
 use cantrik_core::llm::{ProviderKind, load_providers_toml, providers_toml_path, resolve_api_key};
 
-pub(crate) fn run(cwd: &Path) -> ExitCode {
+/// Lines for `cantrik doctor` and REPL `/doctor` (same content, no secrets).
+pub(crate) fn report_lines(cwd: &Path) -> Vec<String> {
+    let mut lines = Vec::new();
     let paths = resolve_config_paths(cwd);
     let providers_path = providers_toml_path();
 
-    println!("doctor: Cantrik {}", env!("CARGO_PKG_VERSION"));
-    println!("  global config : {}", paths.global.display());
-    println!("  project config: {}", paths.project.display());
-    println!("  providers.toml: {}", providers_path.display());
+    lines.push(format!("doctor: Cantrik {}", env!("CARGO_PKG_VERSION")));
+    lines.push(format!("  global config : {}", paths.global.display()));
+    lines.push(format!("  project config: {}", paths.project.display()));
+    lines.push(format!("  providers.toml: {}", providers_path.display()));
 
     match load_providers_toml(&providers_path) {
         Ok(prov) => {
-            println!("  providers load: OK");
+            lines.push("  providers load: OK".to_string());
             for kind in ProviderKind::ALL {
                 let status = match kind {
                     ProviderKind::Ollama => "local (no API key required)",
@@ -39,29 +41,45 @@ pub(crate) fn run(cwd: &Path) -> ExitCode {
                         }
                     }
                 };
-                println!("  - {}: {status}", kind.as_str());
+                lines.push(format!("  - {}: {status}", kind.as_str()));
             }
         }
-        Err(e) => println!("  providers: {e}"),
+        Err(e) => lines.push(format!("  providers: {e}")),
     }
 
     match load_merged_config(cwd) {
         Ok(config) => {
-            println!("  config load: OK");
+            lines.push("  config load: OK".to_string());
             if let Some(lang) = config.ui.language.as_deref() {
-                println!("  ui.language  : {lang}");
+                lines.push(format!("  ui.language  : {lang}"));
             }
             if let Some(p) = config.llm.provider.as_deref() {
-                println!("  llm.provider : {p}");
+                lines.push(format!("  llm.provider : {p}"));
             }
             if let Some(m) = config.llm.model.as_deref() {
-                println!("  llm.model    : {m}");
+                lines.push(format!("  llm.model    : {m}"));
             }
-            ExitCode::SUCCESS
         }
-        Err(error) => {
-            eprintln!("  config load: FAILED — {error}");
-            ExitCode::from(1)
+        Err(error) => lines.push(format!("  config load: FAILED — {error}")),
+    }
+
+    lines
+}
+
+pub(crate) fn run(cwd: &Path) -> ExitCode {
+    let lines = report_lines(cwd);
+    let mut config_failed = false;
+    for line in &lines {
+        if line.contains("config load: FAILED") {
+            config_failed = true;
+            eprintln!("{line}");
+        } else {
+            println!("{line}");
         }
+    }
+    if config_failed {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
     }
 }

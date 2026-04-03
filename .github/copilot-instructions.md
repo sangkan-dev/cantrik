@@ -2,7 +2,7 @@
 
 ## Project Context
 - Project: `cantrik` (Open-source AI CLI agent berbasis Rust).
-- Sumber requirement utama: `prd/cantrik-doc.js`.
+- Sumber requirement utama: `prd/cantrik-prd.md`.
 - Tracking delivery: `TASK.md` (model sprint + checklist).
 - Prioritas sekarang: membangun fondasi Phase 0 -> Phase 1 dari PRD.
 

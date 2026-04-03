@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## Konteks proyek
 - Proyek: `cantrik` (CLI agent AI open source berbasis Rust).
-- Sumber requirement utama: `prd/cantrik-doc.js`.
+- Sumber requirement utama: `prd/cantrik-prd.md`.
 - Tracking delivery: `TASK.md` (model sprint + checklist).
 - Prioritas: fondasi Phase 0 → Phase 1 sesuai PRD.
 

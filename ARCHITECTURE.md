@@ -93,4 +93,4 @@ Do not rely on older “Phase 2 = LLM only” labels; align new prose with that 
 
 ---
 
-See **[TASK.md](TASK.md)** for checklists, **[CONTRIBUTING.md](CONTRIBUTING.md)** for workflow, **[prd/cantrik-doc.js](prd/cantrik-doc.js)** for product requirements.
+See **[TASK.md](TASK.md)** for checklists, **[CONTRIBUTING.md](CONTRIBUTING.md)** for workflow, **[prd/cantrik-prd.md](prd/cantrik-prd.md)** for product requirements.

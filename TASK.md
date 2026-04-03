@@ -1,6 +1,6 @@
 # TASK.md - Cantrik Sprint Board
 
-Dokumen ini dipakai untuk tracking implementasi berdasarkan **PRD** di `prd/cantrik-doc.js` (bagian *Roadmap Pengembangan*, fitur inti, arsitektur). Satu sprint diasumsikan ~2 minggu.
+Dokumen ini dipakai untuk tracking implementasi berdasarkan **PRD** di `prd/cantrik-prd.md` (bagian *Roadmap Pengembangan*, fitur inti, arsitektur). Satu sprint diasumsikan ~2 minggu.
 
 ## Legend
 
@@ -10,7 +10,7 @@ Dokumen ini dipakai untuk tracking implementasi berdasarkan **PRD** di `prd/cant
 
 ## Pemetaan PRD → Sprint (ringkas)
 
-| Fase PRD (`cantrik-doc.js`) | Sasaran | Sprint di board |
+| Fase PRD (`cantrik-prd.md`) | Sasaran | Sprint di board |
 |----------------------------|---------|-----------------|
 | **Phase 0** — Fondasi (Bulan 1–2) | CLI dasar, bridge LLM, REPL awal, config | 1–4 |
 | **Phase 1** — Core Intelligence (Bulan 3–4) | AST + vektor + memori sesi + alat file | 5–7 |
@@ -22,7 +22,7 @@ Dokumen ini dipakai untuk tracking implementasi berdasarkan **PRD** di `prd/cant
 ## Baseline (Sudah Ada)
 
 - [x] Inisialisasi project Rust (`Cargo.toml`, `crates/cantrik-cli/src/main.rs`)
-- [x] Draft PRD tersedia di folder `prd/` (`cantrik-doc.js`)
+- [x] Draft PRD tersedia di folder `prd/` (`cantrik-prd.md`)
 
 ---
 

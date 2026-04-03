@@ -83,7 +83,7 @@ cantrik/
 │   └── workflows/
 │       └── ci.yml                  # GitHub Actions CI
 ├── prd/
-│   ├── cantrik-doc.js              # Product Requirements Document
+│   ├── cantrik-prd.md              # Product Requirements Document
 │   └── package.json
 ├── TASK.md                         # Sprint tracking board
 └── crates/
@@ -293,7 +293,7 @@ MIT License — See LICENSE file for details
 ## Contact & Support
 
 - **Issues:** [GitHub Issues](https://github.com/sangkan/cantrik/issues)
-- **PRD & Design:** [prd/cantrik-doc.js](./prd/cantrik-doc.js)
+- **PRD & Design:** [prd/cantrik-prd.md](./prd/cantrik-prd.md)
 - **Sprint Board:** [TASK.md](./TASK.md)
 
 ---

@@ -15,7 +15,7 @@ Cantrik adalah open-source AI CLI agent untuk memahami dan berinteraksi dengan c
 | **README & Setup** | [README.md](README.md) |
 | **Sprint Board** | [TASK.md](TASK.md) |
 | **Contributing Guide** | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| **PRD Document** | [prd/cantrik-doc.js](prd/cantrik-doc.js) |
+| **PRD Document** | [prd/cantrik-prd.md](prd/cantrik-prd.md) |
 | **Copilot Rules** | [.github/copilot-instructions.md](.github/copilot-instructions.md) |
 | **Cursor Rules & skills** | [.cursor/rules/](.cursor/rules/) • [.cursor/skills/](.cursor/skills/) |
 | **GitHub Workflows** | [.github/workflows/ci.yml](.github/workflows/ci.yml) |

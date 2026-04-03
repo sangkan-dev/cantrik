@@ -1,203 +1,96 @@
 # Architecture Overview
 
-This document describes the high-level design of Cantrik.
+High-level map of the Cantrik repo. For sprint status and ordering, treat **[TASK.md](TASK.md)** as the source of truth; this file summarizes structure and intent.
 
-## Multi-Crate Structure
+## Multi-crate workspace
 
-### `cantrik-core` (Library)
+Members: `crates/cantrik-cli` (binary), `crates/cantrik-core` (library). Shared versions live in the root **[Cargo.toml](Cargo.toml)** under `[workspace.dependencies]`.
 
-Core logic shared by all client implementations (CLI, future: API server, IDE plugins).
+### `cantrik-core` (library)
 
-**Modules:**
-- **config** — Configuration loading (2-tier precedence: project > global > defaults)
-- **providers** (Sprint 3) — LLM provider abstraction (trait-based)
-  - Anthropic (Claude)
-  - Google Gemini
-  - Ollama (local)
-- **indexing** (Sprint 5) — Codebase semantic understanding
-  - AST parsing via tree-sitter
-  - File scanning (.gitignore-aware)
-  - Incremental indexing
-- **search** (Sprint 6) — Semantic search engine
-  - Vector embeddings (LanceDB)
-  - Metadata indexing
-  - Query API
-- **memory** (Sprint 7) — Session persistence
-  - SQLite backend
-  - Memory compression
-  - Context pruning
-- **tools** (Sprint 8) — Tool system
-  - Tool registry
-  - Permission tiers
-  - Audit logging
+Shared logic for CLI and any future clients (HTTP daemon, IDE plugins, etc.).
 
-### `cantrik-cli` (Binary)
+**Implemented today (`crates/cantrik-core/src/`):**
 
-CLI entrypoint and user-facing commands.
+| Module | Role |
+|--------|------|
+| `config` | Load and merge TOML: global `~/.config/cantrik/config.toml` + project `.cantrik/cantrik.toml`. Project keys override global. `AppConfig` currently exposes `[ui]` and `[llm]` only. |
+| `llm` | `ask_stream_chunks`, provider HTTP clients (Anthropic, Gemini, Ollama, OpenAI-compatible stack), **`llm/providers.rs`** for `providers.toml` (routing, API keys, fallback chain). Not a separate top-level `providers` crate/module — routing lives inside `llm`. |
 
-**Structure:**
-- `main.rs` — Tokio async runtime, clap dispatch
-- `commands/` (future) — Individual subcommand implementations
-  - `ask.rs` — Query codebase with LLM
-  - `plan.rs` — Planning/refactoring assistance
-  - `index.rs` — Manage codebase index
-  - `doctor.rs` — Diagnostics
-- `repl.rs` (Sprint 4) — Interactive REPL mode
+**Planned (see [TASK.md](TASK.md)):**
 
-## Configuration System
+| Area | Sprint (per board) |
+|------|---------------------|
+| Indexing (tree-sitter, scan, incremental AST artifacts) | 5 |
+| Semantic search / LanceDB | 6 |
+| Session memory (SQLite, pruning, anchors) | 7 |
+| Tool registry, tiers, sandbox | 8+ |
 
-### Precedence
+### `cantrik-cli` (binary)
 
-1. **Project-level** (highest): `.cantrik/cantrik.toml`
-2. **Global**: `~/.config/cantrik/config.toml`
-3. **Defaults** (lowest): Built-in structure
+**Layout (`crates/cantrik-cli/src/`):**
 
-### Format
+- `main.rs` — `#[tokio::main]`; delegates to `cantrik_cli::run().await`.
+- `lib.rs` — CLI entry, stdin pipe mode, REPL wiring.
+- `cli.rs` — `clap` definitions.
+- `repl.rs` — TUI REPL (ratatui / crossterm), streaming via `cantrik_core::llm`.
+- `commands/` — `ask`, `plan`, `index` (scaffold until Sprint 5), `doctor`, `completions`.
 
-TOML with sections:
+## Configuration
 
-```toml
-[llm]
-provider = "anthropic"
-model = "claude-3-sonnet"
-# ... provider-specific settings
+- **Paths:** `resolve_config_paths` in **[config.rs](crates/cantrik-core/src/config.rs)** — global vs `.cantrik/cantrik.toml`.
+- **Merge:** Defaults → global file → project file (project wins per field in `merge`).
+- **Supported sections in code today:** `[ui]`, `[llm]` only. Keys such as `[memory]`, `[index]`, theme/streaming in docs/PRD are **not** yet deserialized unless added to `AppConfig`.
 
-[ui]
-theme = "dark"
-streaming = true
+`providers.toml` (LLM vendors, keys, `fallback_chain`) is separate: loaded from **`~/.config/cantrik/providers.toml`** by the `llm` layer, not merged into `AppConfig`.
 
-[memory]
-# ... session memory settings
+## Async and I/O
 
-[index]
-# ... indexing configuration
-```
+- CLI uses **Tokio** for async LLM calls and spawned work (e.g. REPL uses `spawn_blocking` around the TUI loop while streaming uses `tokio::spawn`).
+- Not everything is async: config and file reads can be synchronous; avoid claiming “all I/O is async”.
 
-### Properties
+## LLM bridge (actual)
 
-- Partial configs valid (missing sections use defaults)
-- Project config overrides specific keys from global
-- Environment variables can override: `CANTRIK_LLM_PROVIDER=gemini`
+- Entry: **`cantrik_core::llm::ask_stream_chunks`** — builds provider attempt chain from `AppConfig` + `providers.toml`, streams text via callback.
+- **No mandatory async trait** for “one provider trait object”; dispatch is concrete modules + shared error type.
 
-## Async Runtime
+## Error handling
 
-**Runtime:** Tokio 1.50+ (multi-threaded)
-- CLI: single-threaded tokio works fine
-- Future: could scale to multi-request scenarios
+- Prefer **`Result`** and **`thiserror`** (e.g. `ConfigError`, `LlmError`). Avoid `unwrap`/`expect` on production paths.
+- Example `ConfigError` shape (paths attached to read/parse failures): see **[config.rs](crates/cantrik-core/src/config.rs)**.
 
-**Patterns:**
-- All I/O operations return `Future`
-- Use `#[tokio::main]` in main.rs
-- Providers implement async trait methods
+## Quality gates
 
-## Error Handling
+**CI ( [.github/workflows/ci.yml](.github/workflows/ci.yml) ):**
 
-**Strategy:** `Result<T, E>` with `thiserror`
+1. `cargo fmt --all -- --check`
+2. `cargo check --workspace --all-targets`
+3. `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+4. `cargo test --workspace --all-targets`
 
-```rust
-#[derive(thiserror::Error, Debug)]
-pub enum ConfigError {
-    #[error("failed to read config file: {0}")]
-    Read(#[from] std::io::Error),
-    
-    #[error("invalid TOML: {0}")]
-    Parse(#[from] toml::de::Error),
-}
-```
+**Optional local hook:** [.githooks/pre-commit](.githooks/pre-commit) runs fmt, clippy, test (without `--workspace`; from repo root this still applies to the workspace).
 
-**Policy:** No `unwrap()` in production code paths. Propagate errors or handle gracefully.
+## Phases vs sprints
 
-## Dependency Management
+PRD phase → sprint mapping is maintained in **[TASK.md](TASK.md)** (“Pemetaan PRD → Sprint”). In short:
 
-**Workspace dependencies** (`Cargo.toml`):
-```toml
-[workspace.dependencies]
-clap = { version = "4.6.0", features = ["derive"] }
-tokio = { version = "1.50.0", features = ["macros", "rt-multi-thread"] }
-# ... etc
-```
+- **Phase 0:** Sprints 1–4 (foundation, LLM bridge v1, REPL TUI).
+- **Phase 1:** Sprints 5–7 (indexing, vectors, session memory & file tools).
+- **Phase 2+:** See TASK board (agentic, advanced, ecosystem).
 
-Members inherit via `.workspace = true`:
-```toml
-[dependencies]
-clap.workspace = true
-```
+Do not rely on older “Phase 2 = LLM only” labels; align new prose with that table.
 
-**Rationale:** Centralized version control, easier upgrades, consistent versions across crates.
+## Design principles
 
-## Quality & Testing
+1. **Thin CLI, fat core** — parsing/HTTP/providers favor `cantrik-core`.
+2. **Type-safe errors** — enums + `thiserror`, propagate to stderr at CLI boundary.
+3. **Pragmatic async** — Tokio where concurrency matters; sync OK for small config/IO.
+4. **Incremental delivery** — ship vertical slices per sprint; check TASK.md.
 
-### Local Gates
+## Extensibility (future)
 
-- **Format check:** `cargo fmt --check`
-- **Type check:** `cargo check --workspace`
-- **Lint:** `cargo clippy -- -D warnings` (no warnings allowed)
-- **Tests:** `cargo test`
-
-Automated via `.githooks/pre-commit`
-
-### Unit Tests
-
-- Place tests in same file with `#[cfg(test)] mod tests`
-- Test non-trivial logic
-- Use descriptive names: `fn test_config_project_overrides_global()`
-
-### CI Pipeline
-
-GitHub Actions (`.github/workflows/ci.yml`):
-1. Checkout
-2. Install Rust (dtolnay/rust-toolchain@stable)
-3. Cache dependencies
-4. Parallel jobs:
-   - `cargo fmt --check`
-   - `cargo check --workspace`
-   - `cargo clippy -- -D warnings`
-   - `cargo test --lib`
-
-## Phases & Milestones
-
-### Phase 0-1: Foundation (Sprints 1-2) ✅ In Progress
-- Multi-crate workspace ✅
-- Config system ✅
-- CLI scaffold (in progress)
-
-### Phase 2: LLM Integration (Sprints 3-4)
-- Multi-provider abstraction
-- REPL + streaming
-
-### Phase 3: Codebase Intelligence (Sprints 5-6)
-- AST indexing
-- Semantic search
-
-### Phase 4: Memory & Safety (Sprints 7-9)
-- Session persistence
-- Tool system + guardrails
-- Audit logging + rollback
-
-### Phase 5: Agentic Execution (Sprints 10+)
-- Re-planning loops
-- Complex task decomposition
-
-## Design Principles
-
-1. **Modular:** Features in separate crates when scale grows
-2. **Type-safe:** Leverage Rust's type system to prevent runtime errors
-3. **Async-first:** All I/O uses async/await
-4. **Testable:** Unit tests for logic, integration tests for workflows
-5. **Documented:** Doc comments + architecture docs
-6. **Incremental:** Ship working features early, iterate
-
-## Future Extensibility
-
-**Potential extensions:**
-- **Web API:** REST server wrapping cantrik-core
-- **IDE Plugins:** VS Code, Sublime Text using core library
-- **Language Support:** Additional tree-sitter languages
-- **Providers:** Local LLMs via additional backends
-- **Persistence:** Distributed session storage
-
-Architecture supports these without major rewrites.
+- Extra treesitter languages, LanceDB, SQLite session store, tool/MCP layers — all sketched in TASK/PRD; crate split (`cantrik-indexing`, etc.) only if compile time or boundaries demand it.
 
 ---
 
-See [TASK.md](../TASK.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) for sprint details and contribution workflow.
+See **[TASK.md](TASK.md)** for checklists, **[CONTRIBUTING.md](CONTRIBUTING.md)** for workflow, **[prd/cantrik-doc.js](prd/cantrik-doc.js)** for product requirements.

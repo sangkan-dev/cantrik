@@ -130,190 +130,232 @@ default_model = "llama-3.3-70b-versatile"
 
 **Goal:** *Tier 3 Project Memory* PRD — LanceDB embedded, embedding lokal.
 
-- [ ] Integrasi LanceDB (embedded) di `.cantrik/index/` (selaras *Directory Structure* PRD)
-- [ ] Pipeline embedding default Ollama (`nomic-embed-text`); opsi cloud/ model lain sesuai PRD
-- [ ] Metadata chunk (path, symbol, bahasa)
-- [ ] Semantic search: API internal + perintah CLI (`index` / search terkait)
+- [x] Integrasi LanceDB (embedded) di `.cantrik/index/lance/` (selaras *Directory Structure* PRD; AST tetap di `ast/`)
+- [x] Pipeline embedding default Ollama HTTP `/api/embed` (`nomic-embed-text`); konfigurasi `[index]` (`vector_model`, `ollama_base`)
+- [x] Metadata chunk (path, symbol, bahasa, kind, byte/row anchors, preview, `content_hash`, `chunk_id`)
+- [x] Semantic search: `cantrik_core::search::{build_vector_index, semantic_search}` + CLI `cantrik search` + `cantrik index` (default jalankan vektor; `--no-vectors` opt-out)
+- [x] `doctor`: status baris LanceDB + opsi config index; CI: `protobuf-compiler` untuk build `lance-encoding`
 
 **Definition of Done:** Query teks mengembalikan chunk relevan dari index lokal tanpa kirim kode ke cloud hanya untuk embedding default.
+
+**Catatan / backlog:** embedding cloud (OpenAI/Azure, dll.) tidak wajib Sprint 6 — lanjut sprint berikutnya bila PRD menghendaki.
+
+**Build:** dependensi Lance membutuhkan `protoc` + include well-known types (`PROTOC_INCLUDE` jika perlu); lihat langkah CI `apt-get install protobuf-compiler`.
 
 ---
 
 ## Sprint 7 — Session memory & alat file (Phase 1)
-
-**Goal:** *Session Memory* + *File tools* PRD (SQLite/sqlx, ringkasan, pruning, anchors).
-
-- [ ] SQLite untuk histori sesi + ringkasan (path PRD: `~/.local/share/cantrik/` ↔ konvensi final di implementasi)
-- [ ] Simpan keputusan penting per sesi
-- [ ] Context pruning + summarization saat window penuh (*Context Compression* PRD)
-- [ ] *Memory anchors* (`anchors.md` global + opsi proyek)
-- [ ] Tool: `read_file`, `write_file` dengan **diff preview** + approval sebelum tulis
-
+ 
+**Goal:** Session Memory + File tools PRD (SQLite/sqlx, ringkasan, pruning, anchors).
+ 
+- [ ] SQLite untuk histori sesi + ringkasan (`~/.local/share/cantrik/memory.db`)
+- [ ] Simpan keputusan penting per sesi; query sesi sebelumnya
+- [ ] Context pruning + hierarchical summarization saat window penuh (§4.6 PRD)
+- [ ] Memory anchors (`anchors.md` global + opsi proyek) — always injected
+- [ ] Tool: `read_file`, `write_file` dengan diff preview + approval sebelum tulis
+- [ ] Tier 4 Global Memory skeleton — stub untuk Adaptive Learning (implementasi penuh di Sprint 19)
+ 
 **Definition of Done:** Sesi bisa dilanjutkan dengan ringkasan; tulis file tidak tanpa preview/approve; anchor ikut dimuat ke konteks.
-
+ 
 ---
-
+ 
 ## Sprint 8 — Tool system & sandbox (Phase 2)
-
-**Goal:** Eksekusi aman — selaras *Sandboxed Execution* + *Permission Tiers* PRD.
-
-- [ ] Registry tool: `run_command`, `search`/grep codebase, `read_file`/`write_file` (integrasi penuh dengan tier)
-- [ ] Tier: forbidden / require_approval / auto_approve
+ 
+**Goal:** Eksekusi aman — Sandboxed Execution + Permission Tiers PRD.
+ 
+- [ ] Registry tool: `run_command`, `search`/grep, `read_file`/`write_file` (integrasi penuh dengan tier)
+- [ ] Tier: forbidden / require_approval / auto_approve (§5 PRD)
 - [ ] Prompt approval untuk write, exec, network
-- [ ] Sandbox level `restricted` minimum viable (bubblewrap Linux / setara macOS sesuai PRD)
-- [ ] `git_ops` read-only + `web_fetch` opsional dengan approval (sesuai Phase 2 PRD)
-
+- [ ] Sandbox level `restricted` minimum viable (bubblewrap Linux / sandbox-exec macOS)
+- [ ] `git_ops` read-only + `web_fetch` opsional dengan approval
+ 
 **Definition of Done:** Tidak ada write/exec/network tanpa jalur approval; sandbox default aktif untuk exec.
-
+ 
 ---
-
+ 
 ## Sprint 9 — Checkpoint, rollback, audit (Phase 2)
-
-**Goal:** *Checkpointing & Rollback* + *Audit Log* PRD.
-
+ 
+**Goal:** Checkpointing & Rollback + Audit Log PRD (§4.5, §5).
+ 
 - [ ] Auto checkpoint sebelum operasi write (`.cantrik/checkpoints/`)
-- [ ] Perintah `rollback` + list checkpoint
-- [ ] Audit log append-only (+ human-readable sesuai contoh PRD)
-- [ ] Cost tracking dasar per aksi / model
-
-**Definition of Done:** Satu alur tulis file bisa di-rollback; aksi tercatat di audit.
-
+- [ ] Perintah `rollback` + `rollback --list` + `rollback <id>`
+- [ ] Audit log append-only (`~/.local/share/cantrik/audit.log`) sesuai contoh PRD
+- [ ] Cost tracking per aksi / model — disiapkan untuk `/cost` command
+- [ ] Provenance metadata per baris kode yang ditulis Cantrik (§4.10 PRD) — inline comment atau `.cantrik/provenance.json`
+ 
+**Definition of Done:** Satu alur tulis file bisa di-rollback; aksi tercatat di audit dengan cost.
+ 
 ---
-
+ 
 ## Sprint 10 — Planning, re-planning & escalation (Phase 2)
-
-**Goal:** *Long-horizon Planning* + *Stuck Detection* PRD.
-
+ 
+**Goal:** Long-horizon Planning + Stuck Detection PRD (§4.4).
+ 
 - [ ] Mesin plan → act → evaluate; re-plan jika langkah gagal
-- [ ] Deteksi stuck (threshold percobaan, contoh PRD: 3)
-- [ ] Eskalasi ke user dengan ringkasan percobaan
-- [ ] Integrasi ke mode `--plan` / `plan` subcommand
-
-**Definition of Done:** Task multi-step percobaan sederhana bisa re-plan atau berhenti dengan pesan eskalasi jelas.
-
+- [ ] Deteksi stuck (threshold default: 3 percobaan berbeda)
+- [ ] Eskalasi ke user dengan ringkasan percobaan yang sudah dilakukan
+- [ ] Integrasi ke subcommand `cantrik plan` dan perintah `/plan`
+- [ ] Experiment Mode (§4.21): eksekusi perubahan, run test/benchmark, auto-revert jika tidak ada improvement
+ 
+**Definition of Done:** Task multi-step bisa re-plan atau berhenti dengan pesan eskalasi jelas; experiment mode bisa revert otomatis.
+ 
 ---
-
+ 
 ## Sprint 11 — Multi-agent v1 (Phase 2)
-
-**Goal:** *Multi-Agent Orchestration* PRD.
-
-- [ ] Orchestrator + konteks sub-agent terpisah
-- [ ] Eksekusi paralel (`tokio`)
-- [ ] Summary propagation ke orchestrator
-- [ ] Batas kedalaman spawn (default 3)
-- [ ] Isolasi kegagalan satu sub-agent
-
-**Definition of Done:** Satu task terdekomposisi ke beberapa sub-agent paralel lebih cepat dari urutan serial pada skenario uji.
-
+ 
+**Goal:** Multi-Agent Orchestration PRD (§4.2).
+ 
+- [ ] Orchestrator + konteks sub-agent terpisah (isolated context window)
+- [ ] Eksekusi paralel via `tokio`
+- [ ] Summary propagation ke orchestrator (hemat token)
+- [ ] Batas kedalaman spawn (default: 3)
+- [ ] Failure isolation — satu sub-agent gagal tidak stop yang lain
+- [ ] Structured Plan & Act Mode — stub awal: Planner (read-only) + Builder (approval) (§4.12 PRD)
+ 
+**Definition of Done:** Task terdekomposisi ke beberapa sub-agent paralel; Planner dapat berjalan tanpa akses write.
+ 
 ---
-
+ 
 ## Sprint 12 — Background agent & daemon (Phase 3)
-
-**Goal:** *Background Agent Mode* PRD (daemon, persistensi, notifikasi).
-
-- [ ] Mode background / long-running + persist progress (SQLite)
-- [ ] Integrasi daemon: systemd user (Linux) / launchd (macOS) — sesuai kemampuan rilis
-- [ ] Notifikasi saat perlu approval (desktop / webhook / flag poll)
-
-**Definition of Done:** Task panjang tetap berjalan setelah terminal tertutup pada skenario yang didukung.
-
+ 
+**Goal:** Background Agent Mode PRD (§4.3).
+ 
+- [ ] Mode background / long-running + persist progress ke SQLite
+- [ ] Integrasi daemon: systemd user service (Linux) / launchd (macOS)
+- [ ] Notifikasi saat perlu approval: desktop (notify-send / osascript), webhook URL, file flag
+- [ ] `cantrik status` — cek progress task background
+ 
+**Definition of Done:** Task panjang tetap berjalan setelah terminal tertutup; notifikasi terkirim saat approval dibutuhkan.
+ 
 ---
-
+ 
 ## Sprint 13 — Plugin & skill system (Phase 3)
-
-**Goal:** Tiga lapis PRD — skill `.md`, Lua `mlua`, WASM `wasmtime`.
-
-- [ ] Auto-inject skill (`.cantrik/skills/*.md`)
-- [ ] Runtime Lua untuk plugin proyek
-- [ ] Runtime WASM untuk plugin advanced
-- [ ] Perintah install/list/update (registry lokal dulu; *cantrik.dev* di Phase 4)
-
-**Definition of Done:** Minimal satu contoh plugin Lua dan satu WASM berjalan di lingkungan dev.
-
+ 
+**Goal:** Tiga lapis PRD — skill `.md`, Lua `mlua`, WASM `wasmtime` (§7 PRD).
+ 
+- [ ] Auto-inject skill (`.cantrik/skills/*.md`) berdasarkan relevansi task
+- [ ] Auto-inject `.cantrik/rules.md` — always injected, berbeda dari skills (§4.19 PRD)
+- [ ] Runtime Lua (`mlua`) untuk plugin proyek — hook `on_task_start`, `after_write`, dll.
+- [ ] Runtime WASM (`wasmtime`) untuk plugin advanced — sandbox penuh
+- [ ] Perintah `cantrik skill install/list/update/remove` (registry lokal dulu)
+- [ ] Macro & Recipe System (§4.18 PRD): `cantrik macro record/stop/run`
+ 
+**Definition of Done:** Minimal satu contoh plugin Lua dan satu WASM berjalan; rules.md selalu di-inject; satu macro bisa di-record dan di-replay.
+ 
 ---
-
+ 
 ## Sprint 14 — Smart routing, biaya & MCP (Phase 3)
-
-**Goal:** *Smart Routing & Cost Control* + *MCP Integration* PRD.
-
-- [ ] Routing model otomatis / threshold (opsi `providers.toml` / config)
-- [ ] Anggaran biaya per sesi & per bulan (config)
-- [ ] `cantrik serve --mcp` (server MCP)
-- [ ] Konsumsi MCP server eksternal (client)
-
-**Definition of Done:** Cantrik bisa dipanggil dari host MCP dan memanggil tools MCP lain pada skenario uji.
-
+ 
+**Goal:** Smart Routing + Cost Control + MCP Integration PRD (§3, §4.9).
+ 
+- [ ] Routing model otomatis berdasarkan task complexity (simple/medium/complex threshold)
+- [ ] Budget: `max_cost_per_session` dan `max_cost_per_month` dari config
+- [ ] `/cost` command — tampilkan usage & biaya real per session + bulan ini
+- [ ] `cantrik serve --mcp` — Cantrik sebagai MCP server
+- [ ] Konsumsi MCP server eksternal (GitHub MCP, Postgres MCP, dll.) sebagai client
+ 
+**Definition of Done:** Cantrik bisa dipanggil dari host MCP dan memanggil tools MCP lain; routing model berfungsi sesuai threshold.
+ 
 ---
-
+ 
 ## Sprint 15 — Semantic diff & kolaborasi (Phase 3)
-
-**Goal:** *Semantic Diff & Merge* + kolaborasi PRD.
-
-- [ ] Output semantic diff + risk assessment + fungsi terdampak
-- [ ] Cek cakupan tes / saran (minimal heuristik)
-- [ ] Mode kolaboratif: export/import konteks atau berbagi sesi (sesuai PRD)
-
-**Definition of Done:** Pengguna bisa meninjau ringkasan perubahan semantik sebelum apply.
-
+ 
+**Goal:** Semantic Diff & Merge + Collaborative Mode PRD (§4.8, §4.23).
+ 
+- [ ] Output semantic diff + risk assessment + fungsi/file terdampak
+- [ ] Cek cakupan tes per perubahan — saran minimal heuristik
+- [ ] Conflict detection Git + saran resolusi
+- [ ] Export/import context (`cantrik export`, `cantrik import`)
+- [ ] Context Handoff Protocol: `cantrik handoff` → `.cantrik/handoff-YYYY-MM-DD.md` (§4.23 PRD)
+- [ ] Session Replay: simpan dan replay sesi (§4.27 PRD)
+ 
+**Definition of Done:** User bisa review ringkasan perubahan semantik sebelum apply; handoff file bisa di-generate dan di-load.
+ 
 ---
-
-## Sprint 16 — Git-native workflow, provenance & web (Phase 3)
-
-**Goal:** *Deep Git-Native Workflow* + *Provenance* + *Web Research* PRD.
-
-- [ ] Auto-branch per task; pesan commit berbasis ringkasan
-- [ ] `pr create` / integrasi GitHub atau GitLab (minimal satu penyedia)
-- [ ] Deteksi konflik + saran resolusi dasar
-- [ ] Mode `fix <issue-url>` (stretch — boleh defer dengan catatan)
-- [ ] Metadata provenance / explainability pada diff atau komentar (selaras contoh PRD)
-- [ ] Web research / browse dengan approval eksplisit
-
-**Definition of Done:** Alur lokal dari branch hingga PR dapat diotomatisasi pada repo demo; aksi web hanya setelah approve.
-
+ 
+## Sprint 16 — Git-native workflow, review & web research (Phase 3)
+ 
+**Goal:** Deep Git-Native Workflow + `cantrik review` + Web Research PRD (§4.11, §4.13, §4.22).
+ 
+- [ ] Auto-branch per task: `feature/cantrik-<task-slug>`
+- [ ] AI-generated commit message (semantic style) + approval sebelum commit
+- [ ] `cantrik pr create` — integrasi GitHub atau GitLab (minimal satu penyedia via `gh` CLI atau MCP)
+- [ ] `cantrik fix <issue-url>` — SWE-agent mode: analisis issue, fix, test, buat PR (stretch — boleh defer sebagian)
+- [ ] `cantrik review` — pre-commit AI review; bisa jadi git pre-commit hook
+- [ ] Web research: `web_search`, `browse_page`, `fetch_docs` dengan approval eksplisit (§4.13 PRD)
+ 
+**Definition of Done:** Alur lokal dari auto-branch hingga PR dapat diotomatisasi pada repo demo; review command bisa run standalone; web fetch hanya setelah approve.
+ 
 ---
-
-## Sprint 17 — Suara, visual, LSP, macro & rules (Phase 3)
-
-**Goal:** Item sisa Phase 3 PRD.
-
-- [ ] Voice-to-code (Whisper lokal) + TTS notifikasi (opsional per platform)
-- [ ] `/visualize` — Mermaid / PlantUML di TUI
-- [ ] Integrasi LSP (Neovim/VS Code) — scope minimal jelas di PR
-- [ ] Macro & recipe system; `.cantrik/rules.md` (*Custom Guardrails* PRD)
-
-**Definition of Done:** Minimal satu alur suara atau visual atau rules teruji end-to-end (tidak perlu semua platform sekaligus).
-
+ 
+## Sprint 17 — Intelligence tools: explain, teach, dependency, experiment (Phase 3)
+ 
+**Goal:** Code archaeology, knowledge extraction, dependency intel, experiment mode PRD (§4.20–4.25).
+ 
+- [ ] `cantrik explain [file] --why` — Code Archaeology via git blame + commit history (§4.20 PRD)
+- [ ] `cantrik teach` — generate ARCHITECTURE.md, ADR, API docs dari codebase (§4.25 PRD)
+- [ ] `cantrik teach --format wiki` — export ke format Obsidian/Notion/Confluence-compatible
+- [ ] `cantrik why <dep>`, `cantrik upgrade`, `cantrik audit` — Dependency Intelligence (§4.24 PRD)
+- [ ] Experiment Mode full implementation: run benchmark, compare, auto-revert (§4.21 PRD)
+ 
+**Definition of Done:** Minimal `cantrik explain` dan `cantrik audit` berjalan end-to-end; experiment mode bisa revert otomatis berdasarkan hasil test.
+ 
 ---
-
-## Sprint 18 — Ekosistem & distribusi (Phase 4)
-
-**Goal:** *Phase 4 — Ecosystem* PRD.
-
-- [ ] Hub/website `cantrik.dev` (placeholder dokumentasi + registry)
-- [ ] `cantrik init` templates per framework
-- [ ] Air-gapped / enterprise offline mode
-- [ ] Packaging: Homebrew, deb/apt, pacman, Nix, winget (bertahap)
-- [ ] VS Code extension (scope panel)
-- [ ] Desktop companion (Tauri) — scope rilis awal
-- [ ] *Tech debt scanner* (`/health`) + *Adaptive Begawan Style Learning* (PRD)
-
-**Definition of Done:** Rilis alpha publik + dokumentasi kontribusi + salah satu saluran distribusi utama.
-
+ 
+## Sprint 18 — LSP, visual, voice & advanced UX (Phase 3)
+ 
+**Goal:** LSP + Visual Intelligence + Voice + TUI enhancements PRD (§4.16–4.17, §4.26, §6 Enhancement).
+ 
+- [ ] Voice-to-Code: `cantrik listen` via Whisper lokal (Ollama) — opt-in (§4.26 PRD)
+- [ ] TTS notifikasi untuk background task — opt-in
+- [ ] `/visualize [callgraph|architecture|dependencies]` → Mermaid/PlantUML di TUI atau export file (§4.17 PRD)
+- [ ] LSP server mode — Cantrik sebagai Language Server untuk Neovim / VS Code / Helix (§4.16 PRD)
+- [ ] TUI Split Pane: thinking log | code preview | semantic diff | approval panel (§6 Enhancement PRD)
+- [ ] Cultural Wisdom Mode: `cultural_wisdom = "light"` / `"full"` (§6 Enhancement PRD)
+- [ ] Multi-root Workspace: support monorepo / beberapa project folder
+ 
+**Definition of Done:** Minimal satu alur voice atau visual atau LSP teruji end-to-end; cultural wisdom mode bisa dikonfigurasi.
+ 
 ---
-
+ 
+## Sprint 19 — Ekosistem & distribusi (Phase 4)
+ 
+**Goal:** Phase 4 — Ecosystem PRD.
+ 
+- [ ] Hub/website `cantrik.dev` (placeholder dokumentasi + registry plugin)
+- [ ] `cantrik init --template <name>` — bootstrap project dengan template per framework
+- [ ] Air-gapped / enterprise offline mode — 100% lokal, tanpa cloud sama sekali
+- [ ] Packaging: Homebrew, deb/apt, pacman, Nix flake, winget (bertahap)
+- [ ] VS Code extension — side panel expose Cantrik capabilities
+- [ ] Desktop companion app (Tauri) — monitor daemon + notifikasi; scope rilis awal terbatas
+- [ ] Tech Debt Scanner production-ready: `/health` — outdated deps, CVE, test coverage, clippy (§4.14 PRD)
+- [ ] Adaptive Begawan Style Learning — belajar dari history approval, simpan ke Tier 4 Global Memory (§4.15 PRD)
+ 
+**Definition of Done:** Rilis alpha publik + dokumentasi kontribusi + salah satu saluran distribusi utama aktif.
+ 
+---
+ 
 ## Backlog — Phase 5 & eksplorasi
-
-**Goal:** *Phase 5 — Maturity & Excellence* PRD.
-
-- [ ] Full autonomous SWE-agent mode
-- [ ] Self-improvement loop pada codebase Cantrik
-- [ ] Benchmark formal vs SWE-bench
-- [ ] Perluasan provider/matrix (OpenRouter, Groq, Azure, …) jika belum
-- [ ] Perluasan bahasa tree-sitter di luar Phase 1 PRD (Kotlin, Swift, …) bila PRD meminta
-- [ ] *Enhancement* PRD: TUI split pane, multi-root workspace, cultural wisdom mode
-
-## Catatan operasional
-
+ 
+**Goal:** Phase 5 — Maturity & Excellence PRD.
+ 
+- [ ] Full autonomous SWE-agent mode — end-to-end fix GitHub issues dengan high reliability
+- [ ] Agent harness improvements: self-reflection loops, better re-planning, visibility dashboard
+- [ ] Self-improvement: Cantrik menganalisis dan suggest improvement ke codebase Cantrik sendiri
+- [ ] Benchmark formal vs SWE-bench / Terminal-Bench
+- [ ] Community-driven recipes & templates di cantrik.dev
+- [ ] Hybrid cloud execution: opt-in via SSH ke instance sendiri untuk task berat
+- [ ] Perluasan bahasa tree-sitter: Kotlin, Swift, Dart, Zig, dll.
+- [ ] TUI Split Pane jika belum selesai di Sprint 18
+- [ ] `cantrik fix <issue-url>` full implementation jika di-defer di Sprint 16
+- [ ] gVisor / Firecracker sandbox untuk isolasi enterprise-grade
+ 
+---
+ 
+## Catatan Operasional
+ 
 - Update status tiap PR: `[ ]` → `[/]` → `[x]`.
 - Satu sprint boleh beberapa PR kecil.
 - Jika scope sprint meleset >30%, pindahkan item ke sprint berikutnya dan catat alasan singkat di PR atau di bawah item bersangkutan.
+- Semua fitur baru yang tidak ada di sprint aktif → tambahkan ke Backlog dulu, baru triase ke sprint yang tepat.
+- File PRD acuan: `prd/cantrik-prd.md` (bukan lagi `prd/cantrik-doc.js`)

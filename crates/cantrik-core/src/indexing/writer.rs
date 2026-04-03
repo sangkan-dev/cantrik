@@ -7,7 +7,7 @@ pub(crate) fn manifest_path(ast_dir: &Path) -> PathBuf {
     ast_dir.join("manifest.json")
 }
 
-pub(crate) fn chunks_path(ast_dir: &Path) -> PathBuf {
+pub fn chunks_path(ast_dir: &Path) -> PathBuf {
     ast_dir.join("chunks.jsonl")
 }
 
@@ -36,6 +36,22 @@ pub(crate) fn write_all(
     std::fs::write(&graph_p, serde_json::to_string_pretty(edges)?)?;
 
     Ok(())
+}
+
+/// All `SourceChunk` lines from `chunks.jsonl` in file order.
+pub fn read_all_source_chunks(path: &Path) -> Result<Vec<super::SourceChunk>, IndexError> {
+    let mut out = Vec::new();
+    if !path.exists() {
+        return Ok(out);
+    }
+    let text = std::fs::read_to_string(path)?;
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        out.push(serde_json::from_str(line)?);
+    }
+    Ok(out)
 }
 
 pub(crate) fn read_chunks_grouped(

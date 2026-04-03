@@ -3,3 +3,4 @@ pub(crate) mod completions;
 pub(crate) mod doctor;
 pub(crate) mod index;
 pub(crate) mod plan;
+pub(crate) mod search;

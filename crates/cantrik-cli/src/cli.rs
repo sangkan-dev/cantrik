@@ -55,9 +55,24 @@ pub enum Command {
     },
     /// Index or refresh the codebase AST index (chunks + intra-file call graph under `.cantrik/index/ast/`).
     Index {
+        /// Skip Ollama embedding + LanceDB step after AST index.
+        #[arg(long)]
+        no_vectors: bool,
         /// Project path to index (default: current directory).
         #[arg(value_name = "PATH")]
         path: Option<PathBuf>,
+    },
+    /// Semantic search over the local vector index (requires Ollama + prior `cantrik index`).
+    Search {
+        /// Project root (default: current directory).
+        #[arg(short = 'C', long = "project", value_name = "DIR")]
+        project: Option<PathBuf>,
+        /// Maximum number of results.
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+        /// Query words (natural language).
+        #[arg(required = true, trailing_var_arg = true, value_name = "QUERY")]
+        query: Vec<String>,
     },
     /// Check Cantrik installation, config, and connectivity (expanded over sprints).
     Doctor,

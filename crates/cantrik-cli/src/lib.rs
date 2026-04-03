@@ -82,7 +82,7 @@ pub async fn run() -> ExitCode {
             let task_line = words_to_line(task);
             return commands::plan::run(&config, &task_line).await;
         }
-        Some(Command::Index { path }) => {
+        Some(Command::Index { path, no_vectors }) => {
             let config = match load_merged_config(&cwd) {
                 Ok(config) => config,
                 Err(error) => {
@@ -90,7 +90,21 @@ pub async fn run() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-            commands::index::run(&config, path.as_deref())
+            commands::index::run(&config, path.as_deref(), *no_vectors).await
+        }
+        Some(Command::Search {
+            project,
+            limit,
+            query,
+        }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(config) => config,
+                Err(error) => {
+                    eprintln!("failed to load config: {error}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            commands::search::run(&config, project.as_deref(), query, *limit).await
         }
         Some(Command::External(extra)) => {
             let config = match load_merged_config(&cwd) {
@@ -233,5 +247,34 @@ mod tests {
         let cli = Cli::try_parse_from(["cantrik", "--debug-config", "doctor"]).expect("parse");
         assert!(cli.global.debug_config);
         assert!(matches!(cli.cmd, Some(Command::Doctor)));
+    }
+
+    #[test]
+    fn parse_search_trailing_query() {
+        let cli = Cli::try_parse_from(["cantrik", "search", "hello", "world"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Search {
+                query,
+                limit,
+                project,
+            } => {
+                assert_eq!(query, vec!["hello", "world"]);
+                assert_eq!(limit, 10);
+                assert!(project.is_none());
+            }
+            _ => panic!("expected search"),
+        }
+    }
+
+    #[test]
+    fn parse_index_no_vectors() {
+        let cli = Cli::try_parse_from(["cantrik", "index", "--no-vectors"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Index { no_vectors, path } => {
+                assert!(no_vectors);
+                assert!(path.is_none());
+            }
+            _ => panic!("expected index"),
+        }
     }
 }

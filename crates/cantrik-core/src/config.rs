@@ -11,6 +11,8 @@ pub struct AppConfig {
     pub ui: UiConfig,
     #[serde(default)]
     pub llm: LlmConfig,
+    #[serde(default)]
+    pub index: IndexConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -22,6 +24,14 @@ pub struct UiConfig {
 pub struct LlmConfig {
     pub provider: Option<String>,
     pub model: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct IndexConfig {
+    /// Ollama embedding model (default in code: `nomic-embed-text`).
+    pub vector_model: Option<String>,
+    /// Ollama HTTP base URL; empty uses `OLLAMA_HOST` / `providers.toml` / `http://127.0.0.1:11434`.
+    pub ollama_base: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,6 +63,13 @@ impl AppConfig {
             llm: LlmConfig {
                 provider: override_config.llm.provider.or(self.llm.provider),
                 model: override_config.llm.model.or(self.llm.model),
+            },
+            index: IndexConfig {
+                vector_model: override_config
+                    .index
+                    .vector_model
+                    .or(self.index.vector_model),
+                ollama_base: override_config.index.ollama_base.or(self.index.ollama_base),
             },
         }
     }

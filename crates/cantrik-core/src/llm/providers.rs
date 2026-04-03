@@ -13,6 +13,14 @@ pub enum ProviderKind {
     Anthropic,
     Gemini,
     Ollama,
+    /// OpenAI (`/v1/chat/completions`).
+    OpenAi,
+    /// Azure OpenAI (deployment in URL).
+    AzureOpenAi,
+    /// OpenRouter (OpenAI-compatible API).
+    OpenRouter,
+    /// Groq (`/openai/v1/chat/completions`).
+    Groq,
 }
 
 impl ProviderKind {
@@ -21,6 +29,10 @@ impl ProviderKind {
             "anthropic" | "claude" => Some(Self::Anthropic),
             "gemini" | "google" => Some(Self::Gemini),
             "ollama" => Some(Self::Ollama),
+            "openai" | "openai-api" => Some(Self::OpenAi),
+            "azure" | "azure-openai" | "openai-azure" => Some(Self::AzureOpenAi),
+            "openrouter" => Some(Self::OpenRouter),
+            "groq" => Some(Self::Groq),
             _ => None,
         }
     }
@@ -30,8 +42,23 @@ impl ProviderKind {
             Self::Anthropic => "anthropic",
             Self::Gemini => "gemini",
             Self::Ollama => "ollama",
+            Self::OpenAi => "openai",
+            Self::AzureOpenAi => "azure",
+            Self::OpenRouter => "openrouter",
+            Self::Groq => "groq",
         }
     }
+
+    /// All kinds shown in `cantrik doctor` (order stable).
+    pub const ALL: [ProviderKind; 7] = [
+        ProviderKind::Anthropic,
+        ProviderKind::Gemini,
+        ProviderKind::OpenAi,
+        ProviderKind::AzureOpenAi,
+        ProviderKind::OpenRouter,
+        ProviderKind::Groq,
+        ProviderKind::Ollama,
+    ];
 }
 
 /// Resolved model id for one HTTP call.
@@ -53,6 +80,50 @@ pub struct ProviderSections {
     pub anthropic: Option<AnthropicSection>,
     pub gemini: Option<GeminiSection>,
     pub ollama: Option<OllamaSection>,
+    pub openai: Option<OpenAiSection>,
+    pub azure: Option<AzureOpenAiSection>,
+    pub openrouter: Option<OpenRouterSection>,
+    pub groq: Option<GroqSection>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct OpenAiSection {
+    pub api_key: Option<String>,
+    #[serde(default)]
+    pub default_model: Option<String>,
+    /// Base URL including `/v1`, e.g. `https://api.openai.com/v1`.
+    #[serde(default)]
+    pub base_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct AzureOpenAiSection {
+    pub api_key: Option<String>,
+    /// Resource endpoint, e.g. `https://myresource.openai.azure.com`.
+    pub endpoint: String,
+    /// Default deployment name when routing omits `/model`.
+    #[serde(default)]
+    pub default_deployment: Option<String>,
+    #[serde(default)]
+    pub api_version: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct OpenRouterSection {
+    pub api_key: Option<String>,
+    #[serde(default)]
+    pub default_model: Option<String>,
+    #[serde(default)]
+    pub base_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct GroqSection {
+    pub api_key: Option<String>,
+    #[serde(default)]
+    pub default_model: Option<String>,
+    #[serde(default)]
+    pub base_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -148,6 +219,26 @@ pub fn load_providers_toml(path: &Path) -> Result<ProvidersToml, ProvidersLoadEr
     {
         g.api_key = Some(expand_env_placeholders(key)?);
     }
+    if let Some(ref mut o) = file.providers.openai
+        && let Some(ref key) = o.api_key
+    {
+        o.api_key = Some(expand_env_placeholders(key)?);
+    }
+    if let Some(ref mut a) = file.providers.azure
+        && let Some(ref key) = a.api_key
+    {
+        a.api_key = Some(expand_env_placeholders(key)?);
+    }
+    if let Some(ref mut r) = file.providers.openrouter
+        && let Some(ref key) = r.api_key
+    {
+        r.api_key = Some(expand_env_placeholders(key)?);
+    }
+    if let Some(ref mut g) = file.providers.groq
+        && let Some(ref key) = g.api_key
+    {
+        g.api_key = Some(expand_env_placeholders(key)?);
+    }
     Ok(file)
 }
 
@@ -185,6 +276,48 @@ fn gemini_key(section: Option<&GeminiSection>) -> Result<String, ProvidersLoadEr
     env::var("GEMINI_API_KEY").map_err(|_| ProvidersLoadError::MissingEnv("GEMINI_API_KEY".into()))
 }
 
+fn openai_key(section: Option<&OpenAiSection>) -> Result<String, ProvidersLoadError> {
+    if let Some(s) = section
+        && let Some(ref k) = s.api_key
+        && !k.is_empty()
+    {
+        return Ok(k.clone());
+    }
+    env::var("OPENAI_API_KEY").map_err(|_| ProvidersLoadError::MissingEnv("OPENAI_API_KEY".into()))
+}
+
+fn azure_key(section: Option<&AzureOpenAiSection>) -> Result<String, ProvidersLoadError> {
+    if let Some(s) = section
+        && let Some(ref k) = s.api_key
+        && !k.is_empty()
+    {
+        return Ok(k.clone());
+    }
+    env::var("AZURE_OPENAI_API_KEY")
+        .map_err(|_| ProvidersLoadError::MissingEnv("AZURE_OPENAI_API_KEY".into()))
+}
+
+fn openrouter_key(section: Option<&OpenRouterSection>) -> Result<String, ProvidersLoadError> {
+    if let Some(s) = section
+        && let Some(ref k) = s.api_key
+        && !k.is_empty()
+    {
+        return Ok(k.clone());
+    }
+    env::var("OPENROUTER_API_KEY")
+        .map_err(|_| ProvidersLoadError::MissingEnv("OPENROUTER_API_KEY".into()))
+}
+
+fn groq_key(section: Option<&GroqSection>) -> Result<String, ProvidersLoadError> {
+    if let Some(s) = section
+        && let Some(ref k) = s.api_key
+        && !k.is_empty()
+    {
+        return Ok(k.clone());
+    }
+    env::var("GROQ_API_KEY").map_err(|_| ProvidersLoadError::MissingEnv("GROQ_API_KEY".into()))
+}
+
 /// API key for provider (never log this).
 pub fn resolve_api_key(
     kind: ProviderKind,
@@ -194,6 +327,10 @@ pub fn resolve_api_key(
         ProviderKind::Anthropic => anthropic_key(providers.providers.anthropic.as_ref()),
         ProviderKind::Gemini => gemini_key(providers.providers.gemini.as_ref()),
         ProviderKind::Ollama => Ok(String::new()),
+        ProviderKind::OpenAi => openai_key(providers.providers.openai.as_ref()),
+        ProviderKind::AzureOpenAi => azure_key(providers.providers.azure.as_ref()),
+        ProviderKind::OpenRouter => openrouter_key(providers.providers.openrouter.as_ref()),
+        ProviderKind::Groq => groq_key(providers.providers.groq.as_ref()),
     }
 }
 
@@ -214,7 +351,87 @@ pub fn resolve_default_model(kind: ProviderKind, providers: &ProvidersToml) -> O
             .ollama
             .as_ref()
             .and_then(|s| s.default_model.clone()),
+        ProviderKind::OpenAi => providers
+            .providers
+            .openai
+            .as_ref()
+            .and_then(|s| s.default_model.clone()),
+        ProviderKind::AzureOpenAi => providers
+            .providers
+            .azure
+            .as_ref()
+            .and_then(|s| s.default_deployment.clone()),
+        ProviderKind::OpenRouter => providers
+            .providers
+            .openrouter
+            .as_ref()
+            .and_then(|s| s.default_model.clone()),
+        ProviderKind::Groq => providers
+            .providers
+            .groq
+            .as_ref()
+            .and_then(|s| s.default_model.clone()),
     }
+}
+
+fn default_openai_base() -> String {
+    "https://api.openai.com/v1".to_string()
+}
+
+fn default_openrouter_base() -> String {
+    "https://openrouter.ai/api/v1".to_string()
+}
+
+fn default_groq_base() -> String {
+    "https://api.groq.com/openai/v1".to_string()
+}
+
+/// OpenAI `base_url` including `/v1`.
+pub fn openai_api_base(providers: &ProvidersToml) -> String {
+    providers
+        .providers
+        .openai
+        .as_ref()
+        .and_then(|s| s.base_url.as_ref())
+        .map(|u| u.trim_end_matches('/').to_string())
+        .unwrap_or_else(default_openai_base)
+}
+
+pub fn openrouter_api_base(providers: &ProvidersToml) -> String {
+    providers
+        .providers
+        .openrouter
+        .as_ref()
+        .and_then(|s| s.base_url.as_ref())
+        .map(|u| u.trim_end_matches('/').to_string())
+        .unwrap_or_else(default_openrouter_base)
+}
+
+pub fn groq_api_base(providers: &ProvidersToml) -> String {
+    providers
+        .providers
+        .groq
+        .as_ref()
+        .and_then(|s| s.base_url.as_ref())
+        .map(|u| u.trim_end_matches('/').to_string())
+        .unwrap_or_else(default_groq_base)
+}
+
+/// Full URL for Azure chat completions (deployment = model id in routing).
+pub fn azure_chat_completions_url(
+    providers: &ProvidersToml,
+    deployment: &str,
+) -> Result<String, ProvidersLoadError> {
+    let sec = providers
+        .providers
+        .azure
+        .as_ref()
+        .ok_or_else(|| ProvidersLoadError::UnknownProvider("azure section missing".into()))?;
+    let api_version = sec.api_version.as_deref().unwrap_or("2024-02-01-preview");
+    let ep = sec.endpoint.trim_end_matches('/');
+    Ok(format!(
+        "{ep}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
+    ))
 }
 
 pub fn ollama_base_url(providers: &ProvidersToml) -> String {
@@ -255,7 +472,7 @@ pub fn build_attempt_chain(
     if let Some(p) = app_llm_provider {
         let kind = ProviderKind::parse(p).ok_or_else(|| {
             ProvidersLoadError::UnknownProvider(format!(
-                "{p} in cantrik.toml [llm].provider (use anthropic, gemini, or ollama)"
+                "{p} in cantrik.toml [llm].provider (try: anthropic, gemini, openai, azure, openrouter, groq, ollama)"
             ))
         })?;
         let model = app_llm_model
@@ -300,6 +517,10 @@ mod tests {
         let (k2, m2) = parse_route_entry("OLLAMA").expect("ok");
         assert_eq!(k2, ProviderKind::Ollama);
         assert!(m2.is_none());
+        let (k3, _) = parse_route_entry("openai/gpt-4o-mini").expect("ok");
+        assert_eq!(k3, ProviderKind::OpenAi);
+        let (k4, _) = parse_route_entry("groq").expect("ok");
+        assert_eq!(k4, ProviderKind::Groq);
     }
 
     #[test]
@@ -319,6 +540,7 @@ mod tests {
                     default_model: Some("m-o".into()),
                     _embed_model: None,
                 }),
+                ..Default::default()
             },
             routing: Some(RoutingSection {
                 fallback_chain: vec![
@@ -369,13 +591,12 @@ mod tests {
     fn build_chain_fallback_only() {
         let prov = ProvidersToml {
             providers: ProviderSections {
-                anthropic: None,
-                gemini: None,
                 ollama: Some(OllamaSection {
                     base_url: "http://127.0.0.1:11434".into(),
                     default_model: Some("llama3.2".into()),
                     _embed_model: None,
                 }),
+                ..Default::default()
             },
             routing: Some(RoutingSection {
                 fallback_chain: vec!["ollama".into()],

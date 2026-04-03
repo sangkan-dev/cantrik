@@ -16,13 +16,21 @@ pub(crate) fn run(cwd: &Path) -> ExitCode {
     match load_providers_toml(&providers_path) {
         Ok(prov) => {
             println!("  providers load: OK");
-            for kind in [
-                ProviderKind::Anthropic,
-                ProviderKind::Gemini,
-                ProviderKind::Ollama,
-            ] {
+            for kind in ProviderKind::ALL {
                 let status = match kind {
                     ProviderKind::Ollama => "local (no API key required)",
+                    ProviderKind::AzureOpenAi => match prov.providers.azure.as_ref() {
+                        None => "missing [providers.azure]",
+                        Some(sec) => {
+                            if sec.endpoint.trim().is_empty() {
+                                "incomplete (empty endpoint)"
+                            } else if resolve_api_key(kind, &prov).is_ok() {
+                                "endpoint + API key ready"
+                            } else {
+                                "missing API key (set in providers.toml or AZURE_OPENAI_API_KEY)"
+                            }
+                        }
+                    },
                     _ => {
                         if resolve_api_key(kind, &prov).is_ok() {
                             "API key / env ready"

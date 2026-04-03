@@ -65,11 +65,33 @@ Dokumen ini dipakai untuk tracking implementasi berdasarkan **PRD** di `prd/cant
 - [x] Streaming ke stdout dari `cantrik ask`, `plan`, stdin/eksternal; stderr untuk error
 - [x] `[routing].fallback_chain` di `providers.toml` + target primer dari `cantrik.toml` `[llm]`; percobaan berurutan (abort fallback jika sudah ada output)
 - [x] `~/.config/cantrik/providers.toml` + `api_key` / `${VAR}` + fallback ke `ANTHROPIC_API_KEY` / `GEMINI_API_KEY`; `doctor` menampilkan status tanpa secret
-- [ ] (Stretch / backlog) Provider tambahan PRD: OpenAI/Azure, OpenRouter, Groq — belum diimplementasi
+- [x] Provider tambahan PRD: **OpenAI**, **Azure OpenAI** (deployment + `api-version`), **OpenRouter**, **Groq** — streaming via Chat Completions SSE (kompatibel OpenAI)
 
 **Definition of Done:** Minimal satu model per tiga provider utama bisa chat non-interaktif dengan streaming; fallback bisa dikonfigurasi.
 
 **Verifikasi:** uji manual per provider (API key / Ollama lokal); CI hanya tes parsing + rantai fallback (tanpa jaringan).
+
+**Contoh `providers.toml` (cuplikan):**
+
+```toml
+[providers.openai]
+api_key = "${OPENAI_API_KEY}"
+default_model = "gpt-4o-mini"
+
+[providers.azure]
+api_key = "${AZURE_OPENAI_API_KEY}"
+endpoint = "https://YOUR_RESOURCE.openai.azure.com"
+default_deployment = "gpt-4o"
+api_version = "2024-02-01-preview"
+
+[providers.openrouter]
+api_key = "${OPENROUTER_API_KEY}"
+default_model = "anthropic/claude-3.5-sonnet"
+
+[providers.groq]
+api_key = "${GROQ_API_KEY}"
+default_model = "llama-3.3-70b-versatile"
+```
 
 ---
 

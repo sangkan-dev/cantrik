@@ -3,6 +3,7 @@
 mod anthropic;
 mod gemini;
 mod ollama;
+mod openai_compat;
 pub mod providers;
 mod stream_util;
 
@@ -12,8 +13,9 @@ use reqwest::Client;
 use thiserror::Error;
 
 pub use providers::{
-    ProviderKind, ProviderTarget, ProvidersToml, build_attempt_chain, load_providers_toml,
-    ollama_base_url, providers_toml_path, resolve_api_key,
+    ProviderKind, ProviderTarget, ProvidersToml, azure_chat_completions_url, build_attempt_chain,
+    groq_api_base, load_providers_toml, ollama_base_url, openai_api_base, openrouter_api_base,
+    providers_toml_path, resolve_api_key,
 };
 
 use crate::config::AppConfig;
@@ -78,6 +80,61 @@ pub async fn ask_stream_chunks(
             ProviderKind::Ollama => {
                 let base = ollama_base_url(&prov);
                 ollama::stream_chat(&client, &base, &target.model, prompt, &mut forward).await
+            }
+            ProviderKind::OpenAi => {
+                let base = openai_api_base(&prov);
+                let url = format!("{base}/chat/completions");
+                openai_compat::stream_chat_completions(
+                    &client,
+                    &url,
+                    &api_key,
+                    Some(target.model.as_str()),
+                    prompt,
+                    &mut forward,
+                )
+                .await
+            }
+            ProviderKind::AzureOpenAi => {
+                match azure_chat_completions_url(&prov, target.model.as_str()) {
+                    Ok(url) => {
+                        openai_compat::stream_chat_completions(
+                            &client,
+                            &url,
+                            &api_key,
+                            None,
+                            prompt,
+                            &mut forward,
+                        )
+                        .await
+                    }
+                    Err(e) => Err(LlmError::Providers(e)),
+                }
+            }
+            ProviderKind::OpenRouter => {
+                let base = openrouter_api_base(&prov);
+                let url = format!("{base}/chat/completions");
+                openai_compat::stream_chat_completions(
+                    &client,
+                    &url,
+                    &api_key,
+                    Some(target.model.as_str()),
+                    prompt,
+                    &mut forward,
+                )
+                .await
+            }
+            ProviderKind::Groq => {
+                let base = groq_api_base(&prov);
+                let url = format!("{base}/chat/completions");
+                openai_compat::stream_chat_completions(
+                    &client,
+                    &url,
+                    &api_key,
+                    Some(target.model.as_str()),
+                    prompt,
+                    &mut forward,
+                )
+                .await
             }
         };
 

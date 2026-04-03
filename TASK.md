@@ -60,14 +60,16 @@ Dokumen ini dipakai untuk tracking implementasi berdasarkan **PRD** di `prd/cant
 
 **Goal:** Multi-provider dengan antarmuka seragam, streaming, fallback — selaras *LLM Bridge* + *Provider Matrix* PRD (inti: Anthropic, Gemini, Ollama).
 
-- [ ] Trait / abstraction provider LLM (async, streaming)
-- [ ] Provider: Anthropic, Google Gemini, Ollama (lokal)
-- [ ] Streaming response ke terminal
-- [ ] Fallback chain sederhana (urutan provider/model)
-- [ ] `~/.config/cantrik/providers.toml` + manajemen API key via env (spesifikasi PRD *Referensi Konfigurasi*)
-- [ ] (Stretch / backlog) Provider tambahan PRD: OpenAI/Azure, OpenRouter, Groq
+- [x] Abstraksi LLM di `cantrik-core::llm`: `ask_stream_chunks` + orkestrasi async (stream per provider, bukan trait object — cukup untuk v1)
+- [x] Provider: Anthropic (Messages + SSE), Gemini (`streamGenerateContent` REST), Ollama (`/api/chat` NDJSON stream)
+- [x] Streaming ke stdout dari `cantrik ask`, `plan`, stdin/eksternal; stderr untuk error
+- [x] `[routing].fallback_chain` di `providers.toml` + target primer dari `cantrik.toml` `[llm]`; percobaan berurutan (abort fallback jika sudah ada output)
+- [x] `~/.config/cantrik/providers.toml` + `api_key` / `${VAR}` + fallback ke `ANTHROPIC_API_KEY` / `GEMINI_API_KEY`; `doctor` menampilkan status tanpa secret
+- [ ] (Stretch / backlog) Provider tambahan PRD: OpenAI/Azure, OpenRouter, Groq — belum diimplementasi
 
 **Definition of Done:** Minimal satu model per tiga provider utama bisa chat non-interaktif dengan streaming; fallback bisa dikonfigurasi.
+
+**Verifikasi:** uji manual per provider (API key / Ollama lokal); CI hanya tes parsing + rantai fallback (tanpa jaringan).
 
 ---
 

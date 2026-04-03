@@ -68,7 +68,7 @@ pub async fn run() -> ExitCode {
                 }
             };
             let prompt = words_to_line(query);
-            commands::ask::run(&config, &prompt)
+            return commands::ask::run(&config, &prompt).await;
         }
         Some(Command::Plan { task }) => {
             let config = match load_merged_config(&cwd) {
@@ -79,7 +79,7 @@ pub async fn run() -> ExitCode {
                 }
             };
             let task_line = words_to_line(task);
-            commands::plan::run(&config, &task_line)
+            return commands::plan::run(&config, &task_line).await;
         }
         Some(Command::Index { path }) => {
             let config = match load_merged_config(&cwd) {
@@ -100,7 +100,7 @@ pub async fn run() -> ExitCode {
                 }
             };
             let prompt = os_string_args_to_line(extra);
-            commands::ask::run(&config, &prompt)
+            return commands::ask::run(&config, &prompt).await;
         }
         None => {
             // `cantrik --debug-config` alone: match legacy behaviour (resolve + load + exit).
@@ -171,7 +171,7 @@ async fn stdin_pipe_ask(cwd: &Path) -> ExitCode {
         }
     };
 
-    commands::ask::run(&config, &text)
+    commands::ask::run(&config, &text).await
 }
 
 async fn repl_placeholder() -> ExitCode {

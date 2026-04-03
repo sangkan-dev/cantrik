@@ -62,6 +62,16 @@ pub enum Command {
         #[arg(value_name = "PATH")]
         path: Option<PathBuf>,
     },
+    /// SQLite session memory: list sessions or show recent transcript for this project.
+    Session {
+        #[command(subcommand)]
+        sub: SessionCommand,
+    },
+    /// Read/write files (writes print a diff; use `--approve` to apply).
+    File {
+        #[command(subcommand)]
+        sub: FileCommand,
+    },
     /// Semantic search over the local vector index (requires Ollama + prior `cantrik index`).
     Search {
         /// Project root (default: current directory).
@@ -85,6 +95,36 @@ pub enum Command {
     /// Anything that is not a known subcommand is treated as a one-shot `ask` prompt (PRD: `cantrik "..."`).
     #[command(external_subcommand)]
     External(Vec<OsString>),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SessionCommand {
+    /// List sessions stored for the current project fingerprint.
+    List,
+    /// Show the active session transcript (latest session for cwd).
+    Show {
+        /// Max recent messages to print.
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum FileCommand {
+    /// Print file contents (capped by `[memory].max_file_read_bytes`).
+    Read {
+        #[arg(value_name = "PATH")]
+        path: PathBuf,
+    },
+    /// Print unified diff vs stdin (or `--content-file`); pass `--approve` to write.
+    Write {
+        #[arg(value_name = "PATH")]
+        path: PathBuf,
+        #[arg(long)]
+        content_file: Option<PathBuf>,
+        #[arg(long)]
+        approve: bool,
+    },
 }
 
 /// Shells supported by `clap_complete` for static completion scripts.

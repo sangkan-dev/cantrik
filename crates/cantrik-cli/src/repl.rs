@@ -3,9 +3,14 @@
 use std::collections::VecDeque;
 use std::io::Result as IoResult;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use cantrik_core::config::AppConfig;
 use cantrik_core::llm::{self, LlmError};
+use cantrik_core::session::{
+    append_message, build_llm_prompt, connect_pool, load_anchors_combined, maybe_summarize_session,
+    memory_db_path, message_count, open_or_create_session,
+};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::DefaultTerminal;
 use ratatui::layout::{Constraint, Layout};
@@ -31,7 +36,13 @@ enum SlashCmd {
 #[derive(Debug)]
 enum LlmUiMsg {
     Chunk(String),
-    Done(Result<(), String>),
+    Done(Result<(), String>, String),
+}
+
+#[derive(Clone)]
+struct ReplMemory {
+    pool: cantrik_core::session::SqlitePool,
+    session_id: String,
 }
 
 struct ReplState {
@@ -43,10 +54,11 @@ struct ReplState {
     /// Full transcript of assistant replies (for tail display).
     output: String,
     busy: bool,
+    mem: Option<ReplMemory>,
 }
 
 impl ReplState {
-    fn new() -> Self {
+    fn new(mem: Option<ReplMemory>) -> Self {
         Self {
             input: String::new(),
             input_history: Vec::new(),
@@ -54,6 +66,7 @@ impl ReplState {
             thinking: VecDeque::new(),
             output: String::new(),
             busy: false,
+            mem,
         }
     }
 
@@ -68,7 +81,14 @@ impl ReplState {
 /// Run interactive REPL; blocks current thread — call from `spawn_blocking` with Tokio handle.
 pub fn run_sync(cwd: PathBuf, config: AppConfig, rt: Handle) -> IoResult<()> {
     let mut terminal = ratatui::init();
-    let run = run_loop(&mut terminal, cwd, config, rt);
+    let mem = match rt.block_on(connect_pool()) {
+        Ok(pool) => match rt.block_on(open_or_create_session(&pool, cwd.as_path())) {
+            Ok(session_id) => Some(ReplMemory { pool, session_id }),
+            Err(_) => None,
+        },
+        Err(_) => None,
+    };
+    let run = run_loop(&mut terminal, cwd, config, rt, mem);
     ratatui::restore();
     run
 }
@@ -78,11 +98,19 @@ fn run_loop(
     cwd: PathBuf,
     config: AppConfig,
     rt: Handle,
+    mem: Option<ReplMemory>,
 ) -> IoResult<()> {
-    let mut state = ReplState::new();
+    let mut state = ReplState::new(mem);
     let (tx_llm, rx_llm) = std::sync::mpsc::channel::<LlmUiMsg>();
 
     state.push_thinking("Cantrik REPL — /help for commands, Ctrl+C to quit.".to_string());
+    if state.mem.is_some() {
+        state.push_thinking("Session memory: ON (SQLite).".to_string());
+    } else {
+        state.push_thinking(
+            "Session memory: OFF (could not open DB — check ~/.local/share/cantrik/).".to_string(),
+        );
+    }
 
     loop {
         terminal.draw(|frame| ui(frame, &state))?;
@@ -92,12 +120,22 @@ fn run_loop(
                 LlmUiMsg::Chunk(s) => {
                     state.output.push_str(&s);
                 }
-                LlmUiMsg::Done(Ok(())) => {
+                LlmUiMsg::Done(Ok(()), assistant_text) => {
                     state.busy = false;
                     state.output.push('\n');
                     state.push_thinking("assistant: stream finished OK.".to_string());
+                    if let Some(ref m) = state.mem
+                        && let Err(e) = rt.block_on(append_message(
+                            &m.pool,
+                            &m.session_id,
+                            "assistant",
+                            &assistant_text,
+                        ))
+                    {
+                        state.push_thinking(format!("session save: {e}"));
+                    }
                 }
-                LlmUiMsg::Done(Err(e)) => {
+                LlmUiMsg::Done(Err(e), _) => {
                     state.busy = false;
                     state.push_thinking(format!("assistant error: {e}"));
                 }
@@ -216,11 +254,24 @@ fn handle_line(
                 ));
             }
             SlashCmd::Memory => {
-                state.push_thinking("Memory tiers (PRD):".to_string());
-                state
-                    .push_thinking("  Tier1 working: this REPL session (in RAM only).".to_string());
+                state.push_thinking(format!("Tier2 DB: {}", memory_db_path().display()));
+                let mem = state
+                    .mem
+                    .as_ref()
+                    .map(|m| (m.pool.clone(), m.session_id.clone()));
+                if let Some((pool, sid)) = mem {
+                    state.push_thinking(format!("  session_id: {}", sid));
+                    match rt.block_on(message_count(&pool, &sid)) {
+                        Ok(n) => state.push_thinking(format!("  messages: {n}")),
+                        Err(e) => state.push_thinking(format!("  count error: {e}")),
+                    }
+                } else {
+                    state.push_thinking("  session: (not connected)".to_string());
+                }
+                let anc = load_anchors_combined(cwd);
+                state.push_thinking(format!("  anchors loaded: {} chars", anc.len()));
                 state.push_thinking(
-                    "  Tier2 session / Tier3 project vector / Tier4 global: not persisted yet (Sprint 6–7)."
+                    "  Tier3: cantrik index + search; Tier4: adaptive_stub in DB (skeleton)."
                         .to_string(),
                 );
             }
@@ -244,16 +295,46 @@ fn handle_line(
         "thinking: calling LLM… ({})",
         &prompt[..prompt.len().min(80)]
     ));
+
+    let mem = state
+        .mem
+        .as_ref()
+        .map(|m| (m.pool.clone(), m.session_id.clone()));
+    let full_prompt = if let Some((ref pool, ref session_id)) = mem {
+        if let Err(e) = rt.block_on(maybe_summarize_session(pool, session_id, cwd, config)) {
+            state.push_thinking(format!("summarize warn: {e}"));
+        }
+        if let Err(e) = rt.block_on(append_message(pool, session_id, "user", &prompt)) {
+            state.push_thinking(format!("session: {e}"));
+            state.busy = false;
+            return Ok(false);
+        }
+        match rt.block_on(build_llm_prompt(pool, session_id, cwd, config, &prompt)) {
+            Ok(p) => p,
+            Err(e) => {
+                state.push_thinking(format!("context build: {e}"));
+                state.busy = false;
+                return Ok(false);
+            }
+        }
+    } else {
+        prompt.clone()
+    };
+
     let cfg = config.clone();
     let tx_chunk = tx_llm.clone();
     let tx_done = tx_llm.clone();
+    let acc = Arc::new(Mutex::new(String::new()));
+    let acc2 = acc.clone();
     rt.spawn(async move {
-        let r = llm::ask_stream_chunks(&cfg, &prompt, &mut |s| {
+        let r = llm::ask_stream_chunks(&cfg, &full_prompt, &mut |s| {
             let _ = tx_chunk.send(LlmUiMsg::Chunk(s.to_string()));
+            acc2.lock().expect("acc").push_str(s);
             Ok(())
         })
         .await;
-        let _ = tx_done.send(LlmUiMsg::Done(r.map_err(|e: LlmError| e.to_string())));
+        let body = acc.lock().expect("acc").clone();
+        let _ = tx_done.send(LlmUiMsg::Done(r.map_err(|e: LlmError| e.to_string()), body));
     });
 
     Ok(false)

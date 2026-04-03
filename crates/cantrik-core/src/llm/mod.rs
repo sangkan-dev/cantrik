@@ -154,3 +154,14 @@ pub async fn ask_stream_chunks(
         |e| LlmError::Exhausted(e.to_string()),
     ))
 }
+
+/// Collect a full assistant string (used e.g. for session summarization).
+pub async fn ask_complete_text(app: &AppConfig, prompt: &str) -> Result<String, LlmError> {
+    let mut out = String::new();
+    ask_stream_chunks(app, prompt, &mut |s| {
+        out.push_str(s);
+        Ok(())
+    })
+    .await?;
+    Ok(out)
+}

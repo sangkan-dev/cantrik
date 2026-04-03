@@ -147,13 +147,15 @@ default_model = "llama-3.3-70b-versatile"
 ## Sprint 7 — Session memory & alat file (Phase 1)
  
 **Goal:** Session Memory + File tools PRD (SQLite/sqlx, ringkasan, pruning, anchors).
+
+**Batas MVP:** Pruning memakai heuristik token/char (bukan tiktoken penuh). Tier 4 hanya skeleton di DB (`adaptive_stub`); pembelajaran adaptif di Sprint 19.
  
-- [ ] SQLite untuk histori sesi + ringkasan (`~/.local/share/cantrik/memory.db`)
-- [ ] Simpan keputusan penting per sesi; query sesi sebelumnya
-- [ ] Context pruning + hierarchical summarization saat window penuh (§4.6 PRD)
-- [ ] Memory anchors (`anchors.md` global + opsi proyek) — always injected
-- [ ] Tool: `read_file`, `write_file` dengan diff preview + approval sebelum tulis
-- [ ] Tier 4 Global Memory skeleton — stub untuk Adaptive Learning (implementasi penuh di Sprint 19)
+- [x] SQLite untuk histori sesi + ringkasan (`~/.local/share/cantrik/memory.db`)
+- [x] Simpan keputusan penting per sesi; query sesi sebelumnya
+- [x] Context pruning + hierarchical summarization saat window penuh (§4.6 PRD)
+- [x] Memory anchors (`anchors.md` global + opsi proyek) — always injected
+- [x] Tool: `read_file`, `write_file` dengan diff preview + approval sebelum tulis
+- [x] Tier 4 Global Memory skeleton — stub untuk Adaptive Learning (implementasi penuh di Sprint 19)
  
 **Definition of Done:** Sesi bisa dilanjutkan dengan ringkasan; tulis file tidak tanpa preview/approve; anchor ikut dimuat ke konteks.
  

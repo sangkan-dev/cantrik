@@ -3,6 +3,7 @@ use std::process::ExitCode;
 
 use cantrik_core::config::{load_merged_config, resolve_config_paths};
 use cantrik_core::llm::{ProviderKind, load_providers_toml, providers_toml_path, resolve_api_key};
+use cantrik_core::session::memory_db_path;
 
 /// Lines for `cantrik doctor` and REPL `/doctor` (same content, no secrets).
 pub(crate) fn report_lines(cwd: &Path) -> Vec<String> {
@@ -14,6 +15,10 @@ pub(crate) fn report_lines(cwd: &Path) -> Vec<String> {
     lines.push(format!("  global config : {}", paths.global.display()));
     lines.push(format!("  project config: {}", paths.project.display()));
     lines.push(format!("  providers.toml: {}", providers_path.display()));
+    lines.push(format!(
+        "  session memory DB: {}",
+        memory_db_path().display()
+    ));
 
     match load_providers_toml(&providers_path) {
         Ok(prov) => {

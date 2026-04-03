@@ -11,7 +11,7 @@ use std::process::ExitCode;
 use cantrik_core::config::{load_merged_config, resolve_config_paths};
 use clap::Parser;
 
-pub use cli::{Cli, Command, CompletionShell};
+pub use cli::{Cli, Command, CompletionShell, FileCommand, SessionCommand};
 
 const STDIN_MAX_BYTES: u64 = 4 * 1024 * 1024;
 
@@ -69,7 +69,7 @@ pub async fn run() -> ExitCode {
                 }
             };
             let prompt = words_to_line(query);
-            return commands::ask::run(&config, &prompt).await;
+            return commands::ask::run(&config, &cwd, &prompt).await;
         }
         Some(Command::Plan { task }) => {
             let config = match load_merged_config(&cwd) {
@@ -80,7 +80,30 @@ pub async fn run() -> ExitCode {
                 }
             };
             let task_line = words_to_line(task);
-            return commands::plan::run(&config, &task_line).await;
+            return commands::plan::run(&config, &cwd, &task_line).await;
+        }
+        Some(Command::Session { sub }) => match sub {
+            SessionCommand::List => commands::session_cmd::list_cmd(&cwd).await,
+            SessionCommand::Show { limit } => commands::session_cmd::show_cmd(&cwd, *limit).await,
+        },
+        Some(Command::File { sub }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(config) => config,
+                Err(error) => {
+                    eprintln!("failed to load config: {error}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            match sub {
+                FileCommand::Read { path } => commands::file_cmd::read_run(&config, path),
+                FileCommand::Write {
+                    path,
+                    content_file,
+                    approve,
+                } => {
+                    commands::file_cmd::write_run(&config, path, content_file.as_deref(), *approve)
+                }
+            }
         }
         Some(Command::Index { path, no_vectors }) => {
             let config = match load_merged_config(&cwd) {
@@ -115,7 +138,7 @@ pub async fn run() -> ExitCode {
                 }
             };
             let prompt = os_string_args_to_line(extra);
-            return commands::ask::run(&config, &prompt).await;
+            return commands::ask::run(&config, &cwd, &prompt).await;
         }
         None => {
             // `cantrik --debug-config` alone: match legacy behaviour (resolve + load + exit).
@@ -186,7 +209,7 @@ async fn stdin_pipe_ask(cwd: &Path) -> ExitCode {
         }
     };
 
-    commands::ask::run(&config, &text).await
+    commands::ask::run(&config, &cwd, &text).await
 }
 
 async fn repl_run(cwd: std::path::PathBuf) -> ExitCode {

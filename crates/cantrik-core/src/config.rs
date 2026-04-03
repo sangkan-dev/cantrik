@@ -13,6 +13,8 @@ pub struct AppConfig {
     pub llm: LlmConfig,
     #[serde(default)]
     pub index: IndexConfig,
+    #[serde(default)]
+    pub memory: MemoryConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -32,6 +34,18 @@ pub struct IndexConfig {
     pub vector_model: Option<String>,
     /// Ollama HTTP base URL; empty uses `OLLAMA_HOST` / `providers.toml` / `http://127.0.0.1:11434`.
     pub ollama_base: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct MemoryConfig {
+    /// Summarize when sum of chars in "old" messages exceeds this (excluding tail).
+    pub summarize_threshold_chars: Option<u64>,
+    /// Hard cap on assembled prompt size sent to the LLM.
+    pub max_context_chars: Option<u64>,
+    /// Max bytes for `read_file` tool / CLI.
+    pub max_file_read_bytes: Option<u64>,
+    /// Verbatim tail message count preserved when summarizing.
+    pub context_tail_messages: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,6 +84,24 @@ impl AppConfig {
                     .vector_model
                     .or(self.index.vector_model),
                 ollama_base: override_config.index.ollama_base.or(self.index.ollama_base),
+            },
+            memory: MemoryConfig {
+                summarize_threshold_chars: override_config
+                    .memory
+                    .summarize_threshold_chars
+                    .or(self.memory.summarize_threshold_chars),
+                max_context_chars: override_config
+                    .memory
+                    .max_context_chars
+                    .or(self.memory.max_context_chars),
+                max_file_read_bytes: override_config
+                    .memory
+                    .max_file_read_bytes
+                    .or(self.memory.max_file_read_bytes),
+                context_tail_messages: override_config
+                    .memory
+                    .context_tail_messages
+                    .or(self.memory.context_tail_messages),
             },
         }
     }

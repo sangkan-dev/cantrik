@@ -21,6 +21,9 @@ jobs:
       - name: Install protoc (LanceDB / lance-encoding build)
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
+      - name: Install bubblewrap + ripgrep (Sprint 8 tool / sandbox tests)
+        run: sudo apt-get install -y bubblewrap ripgrep
+
       - name: Cache cargo registry
         uses: Swatinem/rust-cache@v2
 

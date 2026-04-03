@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::process::ExitCode;
 
-use cantrik_core::config::{load_merged_config, resolve_config_paths};
+use cantrik_core::config::{effective_sandbox_level, load_merged_config, resolve_config_paths};
 use cantrik_core::llm::{ProviderKind, load_providers_toml, providers_toml_path, resolve_api_key};
 use cantrik_core::session::memory_db_path;
 
@@ -71,6 +71,17 @@ pub(crate) fn report_lines(cwd: &Path) -> Vec<String> {
                 && !b.trim().is_empty()
             {
                 lines.push(format!("  index.ollama_base : {b}"));
+            }
+            let sb = effective_sandbox_level(&config.sandbox);
+            lines.push(format!("  sandbox.level (effective): {sb:?}"));
+            if std::env::var_os("CANTRIK_SANDBOX").as_deref() == Some(std::ffi::OsStr::new("0")) {
+                lines.push("  CANTRIK_SANDBOX=0 (bubblewrap disabled — dev only)".to_string());
+            }
+            if !config.guardrails.forbidden.is_empty() {
+                lines.push(format!(
+                    "  guardrails.forbidden: {:?}",
+                    config.guardrails.forbidden
+                ));
             }
         }
         Err(error) => lines.push(format!("  config load: FAILED — {error}")),

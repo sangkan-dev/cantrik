@@ -15,6 +15,10 @@ pub struct AppConfig {
     pub index: IndexConfig,
     #[serde(default)]
     pub memory: MemoryConfig,
+    #[serde(default)]
+    pub sandbox: SandboxConfig,
+    #[serde(default)]
+    pub guardrails: GuardrailsConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -34,6 +38,39 @@ pub struct IndexConfig {
     pub vector_model: Option<String>,
     /// Ollama HTTP base URL; empty uses `OLLAMA_HOST` / `providers.toml` / `http://127.0.0.1:11434`.
     pub ollama_base: Option<String>,
+}
+
+/// Sandbox level for `run_command` (PRD §4.7).
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum SandboxLevel {
+    /// No isolation (opt-in only).
+    None,
+    /// Default — bubblewrap on Linux, sandbox-exec on macOS when available.
+    #[default]
+    Restricted,
+    /// Not implemented in Sprint 8.
+    Container,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Default)]
+pub struct SandboxConfig {
+    /// When `None`, defaults to [`SandboxLevel::Restricted`] at runtime.
+    #[serde(default)]
+    pub level: Option<SandboxLevel>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct GuardrailsConfig {
+    /// Tool ids (e.g. `run_command`, `write_file`) denied regardless of other lists.
+    #[serde(default)]
+    pub forbidden: Vec<String>,
+    /// Tools that require explicit approval in agent mode (CLI still uses `--approve` where applicable).
+    #[serde(default)]
+    pub require_approval: Vec<String>,
+    /// Tools that may run without a second prompt when autonomy allows (see docs).
+    #[serde(default)]
+    pub auto_approve: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -103,8 +140,43 @@ impl AppConfig {
                     .context_tail_messages
                     .or(self.memory.context_tail_messages),
             },
+            sandbox: SandboxConfig {
+                level: override_config.sandbox.level.or(self.sandbox.level),
+            },
+            guardrails: GuardrailsConfig {
+                forbidden: merge_str_lists(
+                    &self.guardrails.forbidden,
+                    &override_config.guardrails.forbidden,
+                ),
+                require_approval: merge_str_lists(
+                    &self.guardrails.require_approval,
+                    &override_config.guardrails.require_approval,
+                ),
+                auto_approve: merge_str_lists(
+                    &self.guardrails.auto_approve,
+                    &override_config.guardrails.auto_approve,
+                ),
+            },
         }
     }
+}
+
+/// Resolved sandbox level (`None` in config → restricted).
+pub fn effective_sandbox_level(c: &SandboxConfig) -> SandboxLevel {
+    c.level.unwrap_or(SandboxLevel::Restricted)
+}
+
+fn merge_str_lists(base: &[String], project: &[String]) -> Vec<String> {
+    if project.is_empty() {
+        return base.to_vec();
+    }
+    let mut out: Vec<String> = base.to_vec();
+    for s in project {
+        if !out.iter().any(|x| x == s) {
+            out.push(s.clone());
+        }
+    }
+    out
 }
 
 pub fn resolve_config_paths(cwd: &Path) -> ConfigPaths {
@@ -144,10 +216,15 @@ fn read_if_exists(path: &Path) -> Result<AppConfig, ConfigError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    /// Tests that mutate `HOME` must not run in parallel.
+    static CONFIG_TEST_HOME_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn project_config_overrides_global_config() {
+        let _home_lock = CONFIG_TEST_HOME_LOCK.lock().expect("home test lock");
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system time should be valid")
@@ -195,5 +272,54 @@ mod tests {
         assert_eq!(config.ui.language.as_deref(), Some("id"));
         assert_eq!(config.llm.provider.as_deref(), Some("ollama"));
         assert_eq!(config.llm.model.as_deref(), Some("llama3"));
+    }
+
+    #[test]
+    fn guardrails_lists_merge_project_into_global() {
+        let _home_lock = CONFIG_TEST_HOME_LOCK.lock().expect("home test lock");
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be valid")
+            .as_nanos();
+
+        let base = env::temp_dir().join(format!("cantrik-guard-{unique}"));
+        let global_dir = base.join("home/.config/cantrik");
+        let project_dir = base.join("project/.cantrik");
+
+        fs::create_dir_all(&global_dir).expect("global dir");
+        fs::create_dir_all(&project_dir).expect("project dir");
+
+        fs::write(
+            global_dir.join("config.toml"),
+            "[guardrails]\nforbidden = [\"write_file\"]\n",
+        )
+        .expect("global");
+
+        fs::write(
+            project_dir.join("cantrik.toml"),
+            "[guardrails]\nforbidden = [\"run_command\"]\n",
+        )
+        .expect("project");
+
+        let old_home = env::var_os("HOME");
+        unsafe {
+            env::set_var("HOME", base.join("home"));
+        }
+
+        let config = load_merged_config(&base.join("project")).expect("load");
+
+        match old_home {
+            Some(value) => unsafe {
+                env::set_var("HOME", value);
+            },
+            None => unsafe {
+                env::remove_var("HOME");
+            },
+        }
+
+        fs::remove_dir_all(&base).expect("cleanup");
+
+        assert!(config.guardrails.forbidden.contains(&"write_file".into()));
+        assert!(config.guardrails.forbidden.contains(&"run_command".into()));
     }
 }

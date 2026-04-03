@@ -164,12 +164,14 @@ default_model = "llama-3.3-70b-versatile"
 ## Sprint 8 — Tool system & sandbox (Phase 2)
  
 **Goal:** Eksekusi aman — Sandboxed Execution + Permission Tiers PRD.
+
+**Batas MVP:** `container` sandbox belum; macOS `restricted` membutuhkan `CANTRIK_SANDBOX=0` atau bubblewrap tidak dipakai (pesan jelas); LLM tool-calling loop menyusul sprint berikutnya.
  
-- [ ] Registry tool: `run_command`, `search`/grep, `read_file`/`write_file` (integrasi penuh dengan tier)
-- [ ] Tier: forbidden / require_approval / auto_approve (§5 PRD)
-- [ ] Prompt approval untuk write, exec, network
-- [ ] Sandbox level `restricted` minimum viable (bubblewrap Linux / sandbox-exec macOS)
-- [ ] `git_ops` read-only + `web_fetch` opsional dengan approval
+- [x] Registry tool: `run_command`, `search`/grep, `read_file`/`write_file` (integrasi penuh dengan tier)
+- [x] Tier: forbidden / require_approval / auto_approve (§5 PRD)
+- [x] Prompt approval untuk write, exec, network
+- [x] Sandbox level `restricted` minimum viable (bubblewrap Linux / sandbox-exec macOS)
+- [x] `git_ops` read-only + `web_fetch` opsional dengan approval
  
 **Definition of Done:** Tidak ada write/exec/network tanpa jalur approval; sandbox default aktif untuk exec.
  

@@ -3,7 +3,8 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use cantrik_core::config::AppConfig;
-use cantrik_core::tools::{WriteApproval, commit_write, diff_for_new_contents, read_file_capped};
+use cantrik_core::tool_system::{tool_read_file, tool_write_file};
+use cantrik_core::tools::{WriteApproval, diff_for_new_contents};
 
 const STDIN_MAX: u64 = 4 * 1024 * 1024;
 
@@ -11,9 +12,9 @@ fn max_read_bytes(config: &AppConfig) -> u64 {
     config.memory.max_file_read_bytes.unwrap_or(STDIN_MAX)
 }
 
-pub(crate) fn read_run(config: &AppConfig, path: &Path) -> ExitCode {
+pub(crate) fn read_run(config: &AppConfig, project_root: &Path, path: &Path) -> ExitCode {
     let max = max_read_bytes(config);
-    match read_file_capped(path, max) {
+    match tool_read_file(config, project_root, path, max) {
         Ok(s) => {
             print!("{s}");
             if !s.ends_with('\n') {
@@ -48,6 +49,7 @@ fn read_new_content(content_file: Option<&Path>, max_bytes: u64) -> Result<Strin
 
 pub(crate) fn write_run(
     config: &AppConfig,
+    project_root: &Path,
     path: &Path,
     content_file: Option<&Path>,
     approve: bool,
@@ -79,7 +81,9 @@ pub(crate) fn write_run(
         return ExitCode::SUCCESS;
     }
 
-    match commit_write(
+    match tool_write_file(
+        config,
+        project_root,
         path,
         &new_text,
         WriteApproval::user_confirmed_after_reviewing_diff(),

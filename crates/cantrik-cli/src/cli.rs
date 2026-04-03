@@ -72,6 +72,31 @@ pub enum Command {
         #[command(subcommand)]
         sub: FileCommand,
     },
+    /// Run a command under `[sandbox]` policy (use `--approve` after reviewing the dry-run).
+    Exec {
+        #[arg(long)]
+        approve: bool,
+        #[arg(required = true, trailing_var_arg = true, value_name = "COMMAND")]
+        argv: Vec<String>,
+    },
+    /// Run ripgrep (`rg`) for text search (distinct from vector `search`).
+    Rgrep {
+        #[arg(required = true, trailing_var_arg = true, value_name = "RG_ARGS")]
+        args: Vec<String>,
+    },
+    /// Read-only git (allowlisted subcommands only).
+    Git {
+        #[arg(required = true, trailing_var_arg = true, value_name = "GIT_ARGS")]
+        args: Vec<String>,
+    },
+    /// HTTP GET (`--approve` required).
+    Fetch {
+        url: String,
+        #[arg(long)]
+        approve: bool,
+        #[arg(long, default_value_t = 2_000_000_u64)]
+        max_bytes: u64,
+    },
     /// Semantic search over the local vector index (requires Ollama + prior `cantrik index`).
     Search {
         /// Project root (default: current directory).

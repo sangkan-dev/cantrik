@@ -3,4 +3,5 @@ pub mod indexing;
 pub mod llm;
 pub mod search;
 pub mod session;
+pub mod tool_system;
 pub mod tools;

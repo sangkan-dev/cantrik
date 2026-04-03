@@ -95,15 +95,63 @@ pub async fn run() -> ExitCode {
                 }
             };
             match sub {
-                FileCommand::Read { path } => commands::file_cmd::read_run(&config, path),
+                FileCommand::Read { path } => commands::file_cmd::read_run(&config, &cwd, path),
                 FileCommand::Write {
                     path,
                     content_file,
                     approve,
-                } => {
-                    commands::file_cmd::write_run(&config, path, content_file.as_deref(), *approve)
-                }
+                } => commands::file_cmd::write_run(
+                    &config,
+                    &cwd,
+                    path,
+                    content_file.as_deref(),
+                    *approve,
+                ),
             }
+        }
+        Some(Command::Exec { approve, argv }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("failed to load config: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            commands::exec_cmd::run(&config, &cwd, *approve, argv.clone())
+        }
+        Some(Command::Rgrep { args }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("failed to load config: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            commands::rgrep_cmd::run(&config, &cwd, args.clone())
+        }
+        Some(Command::Git { args }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("failed to load config: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            commands::git_cmd::run(&config, &cwd, args.clone())
+        }
+        Some(Command::Fetch {
+            url,
+            approve,
+            max_bytes,
+        }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("failed to load config: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            return commands::fetch_cmd::run(&config, url, *approve, *max_bytes).await;
         }
         Some(Command::Index { path, no_vectors }) => {
             let config = match load_merged_config(&cwd) {

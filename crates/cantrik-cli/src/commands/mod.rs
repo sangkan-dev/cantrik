@@ -1,9 +1,13 @@
 pub(crate) mod ask;
 pub(crate) mod completions;
 pub(crate) mod doctor;
+pub(crate) mod exec_cmd;
+pub(crate) mod fetch_cmd;
 pub(crate) mod file_cmd;
+pub(crate) mod git_cmd;
 pub(crate) mod index;
 pub(crate) mod plan;
+pub(crate) mod rgrep_cmd;
 pub(crate) mod search;
 pub(crate) mod session_cmd;
 pub(crate) mod session_llm;

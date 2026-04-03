@@ -1,0 +1,30 @@
+---
+description: PRD, sprint, dan aturan pelacakan TASK.md
+globs:
+  - "TASK.md"
+  - "prd/**"
+alwaysApply: false
+---
+
+# Planning dan task tracking
+
+## Source of truth
+- PRD: arah produk utama.
+- `TASK.md`: status eksekusi utama.
+
+## Konvensi sprint
+- Status: `[ ]`, `[/]`, `[x]`.
+- Mulai kerja: ubah ke `[/]`.
+- Selesai dan tervalidasi: ubah ke `[x]`.
+
+## Scope
+- Requirement baru: masuk sprint aktif hanya jika effort kecil.
+- Effort besar: pindah ke sprint berikutnya atau backlog dengan alasan singkat.
+
+## Definition of done
+- Jangan `[x]` jika acceptance criteria belum terpenuhi.
+- Cantumkan outcome yang bisa diverifikasi (perintah jalan, test lolos, dll.).
+
+## Kualitas penulisan task
+- Singkat, actionable, terukur.
+- Hindari task abstrak tanpa indikator selesai.

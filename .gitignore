@@ -31,3 +31,4 @@ Thumbs.db
 # Project-specific
 .cantrik/
 *.cantrik.local.toml
+!.cursor/

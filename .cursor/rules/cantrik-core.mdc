@@ -1,0 +1,34 @@
+---
+description: Cantrik project context, delivery, and collaboration rules for all work in this repo
+alwaysApply: true
+---
+
+# Cantrik — aturan inti
+
+## Konteks proyek
+- Proyek: `cantrik` (CLI agent AI open source berbasis Rust).
+- Sumber requirement utama: `prd/cantrik-doc.js`.
+- Tracking delivery: `TASK.md` (model sprint + checklist).
+- Prioritas: fondasi Phase 0 → Phase 1 sesuai PRD.
+
+## Aturan kerja
+- Mulai dari requirement PRD dan mapping ke item sprint di `TASK.md`.
+- Tanpa persetujuan user, jangan perubahan destruktif atau berisiko tinggi.
+- Patch kecil, terukur, mudah direview; hindari dependency baru tanpa alasan teknis jelas.
+- Jika ada beberapa opsi, pilih yang paling sederhana yang memenuhi requirement.
+
+## Rust (ringkas)
+- `Result<T, E>` di jalur error; hindari `unwrap()` / `expect()` di production path.
+- Modul fokus saat fitur membesar (parser, config, provider, tool).
+- Naming: `snake_case` fungsi/variabel, `PascalCase` untuk tipe.
+- Unit test untuk logic non-trivial; build bebas warning (clippy, rustfmt).
+
+## Delivery
+- Fitur baru: sebutkan acceptance criteria sebelum dianggap selesai.
+- `TASK.md`: `[/]` saat mulai, `[x]` saat selesai tervalidasi.
+- Jika task melebar dari scope sprint, catat defer reason singkat.
+
+## Kolaborasi
+- Trade-off teknis singkat dan berbasis dampak.
+- Jika blocked asumsi/produk, minta konfirmasi dengan pertanyaan spesifik.
+- Penjelasan ke user dalam Bahasa Indonesia kecuali diminta lain.

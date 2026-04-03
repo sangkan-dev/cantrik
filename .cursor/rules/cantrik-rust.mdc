@@ -1,0 +1,37 @@
+---
+description: Konvensi implementasi Rust dan Cargo untuk repo Cantrik
+globs:
+  - "**/*.rs"
+  - "**/Cargo.toml"
+alwaysApply: false
+---
+
+# Rust — implementasi Cantrik
+
+## Arsitektur
+- `main.rs` tipis; logika baru ke modul fokus.
+- Kelompokkan menurut concern: `cli`, `config`, `llm`, `memory`, `tools`, `agent`.
+- Untuk komponen seperti provider, utamakan interface eksplisit (traits).
+
+## Aman dan andal
+- Tanpa `unwrap()` / `expect()` di alur runtime.
+- Erorkan dengan `thiserror` / enum kustom jika tersedia.
+- Validasi input eksternal awal (args CLI, config, env).
+
+## Async dan IO
+- Async hanya jika operasi IO-bound membenarkannya.
+- Hindari blocking di dalam konteks async.
+- Timeout/retry untuk operasi jaringan.
+
+## Testing
+- Unit test untuk parser, mapper, planner.
+- Integration test untuk permukaan perintah CLI jika memungkinkan.
+- Sediakan jalur sukses dan minimal satu jalur gagal.
+
+## Quality gate
+- Kompatibel dengan `cargo fmt`, `cargo clippy`, `cargo test`.
+- Diff terfokus; hindari refactor tidak terkait.
+
+## Paket
+- Tambah dependency dengan `cargo add` agar `Cargo.toml` rapi.
+- Saat menambah crate, update anggota workspace jika perlu.

@@ -114,13 +114,15 @@ default_model = "llama-3.3-70b-versatile"
 
 **Goal:** Pemahaman struktur kode selaras *Codebase Intelligence* PRD.
 
-- [ ] Integrasi `tree-sitter` — prioritas PRD Phase 1: Rust, Python, JS/TS, Go (perluasan bahasa di PRD: Java, C/C++, PHP, Ruby, SQL, TOML, JSON, YAML, Markdown = backlog bertahap)
-- [ ] AST-aware chunking (batas fungsi/class, bukan potong karakter naif)
-- [ ] *Dependency graph* (siapa memanggil siapa) — sesuai fitur inti PRD
-- [ ] File scanner `.gitignore`-aware + batas ukuran/file biner
-- [ ] Re-index inkremental (hanya file berubah)
+- [x] Integrasi `tree-sitter` — Phase 1 PRD: Rust, Python, JS/TS/TSX, Go, Java, C/C++ (`.c`/`.h` vs `.cpp`/`.cc`/…), PHP, Ruby, SQL (`tree-sitter-sequel`), TOML (`tree-sitter-toml-ng`), JSON, YAML, Markdown (`tree-sitter-md` blok)
+- [x] AST-aware chunking (batas fungsi/class, bukan potong karakter naif)
+- [x] *Dependency graph* (siapa memanggil siapa) — sesuai fitur inti PRD
+- [x] File scanner `.gitignore`-aware + batas ukuran/file biner
+- [x] Re-index inkremental (hanya file berubah)
 
 **Definition of Done:** Index folder proyek menghasilkan chunk AST + metadata path/symbol; scan menghormati `.gitignore`.
+
+**Catatan:** Artefak di `.cantrik/index/ast/` (`manifest.json`, `chunks.jsonl`, `graph.json`). Graf v1 hanya **intra-file** (nama callee dari AST panggilan; tanpa resolusi import/symbol lintas file). Sprint 6 (LanceDB) dapat memakai direktori `.cantrik/index/` untuk vektor. SQL/Markdown/TOML memakai grammar crate yang selaras **tree-sitter 0.26**; chunk SQL/Markdown bisa kasar (per-statement / heading+code fence); data non-kode (JSON/YAML/TOML) berbasis struktur parse, bukan “fungsi”.
 
 ---
 
@@ -307,7 +309,7 @@ default_model = "llama-3.3-70b-versatile"
 - [ ] Self-improvement loop pada codebase Cantrik
 - [ ] Benchmark formal vs SWE-bench
 - [ ] Perluasan provider/matrix (OpenRouter, Groq, Azure, …) jika belum
-- [ ] Perluasan bahasa tree-sitter penuh sesuai daftar PRD
+- [ ] Perluasan bahasa tree-sitter di luar Phase 1 PRD (Kotlin, Swift, …) bila PRD meminta
 - [ ] *Enhancement* PRD: TUI split pane, multi-root workspace, cultural wisdom mode
 
 ## Catatan operasional

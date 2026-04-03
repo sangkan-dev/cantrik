@@ -16,12 +16,12 @@ Shared logic for CLI and any future clients (HTTP daemon, IDE plugins, etc.).
 |--------|------|
 | `config` | Load and merge TOML: global `~/.config/cantrik/config.toml` + project `.cantrik/cantrik.toml`. Project keys override global. `AppConfig` currently exposes `[ui]` and `[llm]` only. |
 | `llm` | `ask_stream_chunks`, provider HTTP clients (Anthropic, Gemini, Ollama, OpenAI-compatible stack), **`llm/providers.rs`** for `providers.toml` (routing, API keys, fallback chain). Not a separate top-level `providers` crate/module — routing lives inside `llm`. |
+| `indexing` | `build_index`: tree-sitter (Rust, Python, JS/TS/TSX, Go, Java, C/C++, PHP, Ruby, SQL, TOML, JSON, YAML, Markdown), AST-ish chunks, incremental manifest + reuse, intra-file call edges; artifacts under **`.cantrik/index/ast/`**. |
 
 **Planned (see [TASK.md](TASK.md)):**
 
 | Area | Sprint (per board) |
 |------|---------------------|
-| Indexing (tree-sitter, scan, incremental AST artifacts) | 5 |
 | Semantic search / LanceDB | 6 |
 | Session memory (SQLite, pruning, anchors) | 7 |
 | Tool registry, tiers, sandbox | 8+ |
@@ -34,7 +34,7 @@ Shared logic for CLI and any future clients (HTTP daemon, IDE plugins, etc.).
 - `lib.rs` — CLI entry, stdin pipe mode, REPL wiring.
 - `cli.rs` — `clap` definitions.
 - `repl.rs` — TUI REPL (ratatui / crossterm), streaming via `cantrik_core::llm`.
-- `commands/` — `ask`, `plan`, `index` (scaffold until Sprint 5), `doctor`, `completions`.
+- `commands/` — `ask`, `plan`, `index`, `doctor`, `completions`.
 
 ## Configuration
 

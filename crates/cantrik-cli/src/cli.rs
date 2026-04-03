@@ -53,7 +53,7 @@ pub enum Command {
         #[arg(trailing_var_arg = true, required = true, value_name = "TASK")]
         task: Vec<String>,
     },
-    /// Index or refresh the codebase index (indexer comes in later sprints).
+    /// Index or refresh the codebase AST index (chunks + intra-file call graph under `.cantrik/index/ast/`).
     Index {
         /// Project path to index (default: current directory).
         #[arg(value_name = "PATH")]

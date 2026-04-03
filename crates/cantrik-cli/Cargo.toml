@@ -11,5 +11,5 @@ path = "src/main.rs"
 [dependencies]
 cantrik-core = { path = "../cantrik-core" }
 clap.workspace = true
-reqwest.workspace = true
+clap_complete.workspace = true
 tokio.workspace = true

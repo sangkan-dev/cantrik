@@ -44,11 +44,13 @@ Dokumen ini dipakai untuk tracking implementasi berdasarkan **PRD** di `prd/cant
 
 **Goal:** Struktur `clap` dan UX perintah konsisten sesuai PRD (subcommand + mode input dasar).
 
-- [ ] Parser `clap` + subcommand utama: `ask`, `plan`, `index`, `doctor` (+ `--help` konsisten)
-- [ ] Mode one-shot: `cantrik "..."` (setelah args utama terpenuhi)
-- [ ] REPL / interactive: entry point (`cantrik` tanpa subcommand atau flag terdedikasi) — minimal placeholder loop exit
-- [ ] Shell completion generation (`clap_complete`)
-- [ ] Mode input PRD (minimal viable): `--plan`, pipe dari stdin (contoh: `cargo build 2>&1 | cantrik`), `--watch`, `--from-clipboard`, `--image` — boleh bertahap; yang belum = deferred dengan catatan di PR
+- [x] Parser `clap` + subcommand utama: `ask`, `plan`, `index`, `doctor` (+ `--help` konsisten)
+- [x] Mode one-shot: `cantrik "..."` (alias ke `ask` via `external_subcommand` — argumen tidak bentrok dengan nama subcommand)
+- [x] REPL / interactive: `cantrik` tanpa subcommand di TTY — placeholder loop (`exit`/`quit`/EOF); TUI penuh di Sprint 4
+- [x] Shell completion generation (`clap_complete`), subcommand `completions <bash|zsh|fish|elvish|powershell>`
+- [x] Pipe dari stdin ke `ask` ketika stdin bukan TTY (batas ~4 MiB)
+- [x] Flag tersembunyi stub: `--watch`, `--from-clipboard`, `--image` → pesan + exit code 2 (belum diimplementasi)
+- **Deferred:** flag root `--plan "…"` ala PRD; gunakan **`cantrik plan "…"`** sampai flag global ditambahkan. Integrasi clipboard/watch/vision sesungguhnya di sprint berikutnya.
 
 **Definition of Done:** Pengguna bisa memanggil tiap subcommand utama, help jelas, completion bisa di-generate; satu path one-shot dan satu path REPL jalan.
 

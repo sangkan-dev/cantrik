@@ -307,6 +307,15 @@ pub enum Command {
         #[arg(long, value_name = "TEXT")]
         raw_text: Option<String>,
     },
+    /// Create `.cantrik/` starter files (`cantrik.toml`, `rules.md`) from a template.
+    Init {
+        /// Template: `generic` or `rust-cli`.
+        #[arg(long, default_value = "generic")]
+        template: String,
+        /// Project root (default: current directory).
+        #[arg(default_value = ".", value_name = "PATH")]
+        path: PathBuf,
+    },
     /// Check Cantrik installation, config, and connectivity (expanded over sprints).
     Doctor,
     /// Print shell completions to stdout (write to a file or source from your shell).

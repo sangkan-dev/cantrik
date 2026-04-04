@@ -1,0 +1,11 @@
+{
+	"schema_version": 1,
+	"plugins": [
+		{
+			"id": "example-placeholder",
+			"name": "Example plugin (placeholder)",
+			"repo": "https://github.com/sangkan-dev/cantrik",
+			"description": "Registry MVP — submit plugins via GitHub discussion or PR to this list."
+		}
+	]
+}

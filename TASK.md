@@ -346,20 +346,25 @@ default_model = "llama-3.3-70b-versatile"
  
 **Goal:** Phase 4 — Ecosystem PRD.
  
-- [ ] Hub/website `cantrik.sangkan.dev` (placeholder dokumentasi + registry plugin)
-- [ ] `cantrik init --template <name>` — bootstrap project dengan template per framework
+- [x] Hub / website — monorepo [`apps/cantrik-site`](apps/cantrik-site/) (SvelteKit static, nuansa Sangkan); target deploy `cantrik.sangkan.dev`; registry plugin = JSON statis MVP
+- [x] `cantrik init --template <name>` — MVP: `generic`, `rust-cli` (`.cantrik/cantrik.toml` + `rules.md`); template per framework penuh ditunda
+- [x] Saluran distribusi utama (MVP) — binary Linux via **GitHub Releases** pada tag `v*` (`.github/workflows/release.yml`); Homebrew/deb/Nix/winget = lanjutan
 - [ ] Air-gapped / enterprise offline mode — 100% lokal, tanpa cloud sama sekali
-- [ ] Packaging: Homebrew, deb/apt, pacman, Nix flake, winget (bertahap)
+- [ ] Packaging tambahan: Homebrew, deb/apt, pacman, Nix flake, winget (bertahap)
 - [ ] VS Code extension — side panel expose Cantrik capabilities
 - [ ] Desktop companion app (Tauri) — monitor daemon + notifikasi; scope rilis awal terbatas
 - [ ] Tech Debt Scanner production-ready: `/health` — outdated deps, CVE, test coverage, clippy (§4.14 PRD)
 - [ ] Adaptive Begawan Style Learning — belajar dari history approval, simpan ke Tier 4 Global Memory (§4.15 PRD)
  
+**Batas MVP (Sprint 19):** Hub = landing + nav docs/registry; plugin list = `static/registry/plugins.json`; CI terpisah untuk site; tidak ada marketplace atau auth. Init = 2 template saja. Rilis = satu artefak `cantrik` (Linux) per tag; verifikasi checksum manual sampai ada signing otomatis.
+ 
 **Definition of Done:** Rilis alpha publik + dokumentasi kontribusi + salah satu saluran distribusi utama aktif.
  
 ---
  
-## Backlog — Phase 5 & eksplorasi
+## Backlog — Phase 4 lanjutan & Phase 5
+ 
+**Phase 4 (tunda dari Sprint 19):** mode air-gapped terdokumentasi + audit jaringan; Homebrew / distro packages; VS Code extension; Tauri companion; `/health` scanner; Adaptive Begawan.
  
 **Goal:** Phase 5 — Maturity & Excellence PRD.
  

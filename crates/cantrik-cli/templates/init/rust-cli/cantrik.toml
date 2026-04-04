@@ -1,0 +1,4 @@
+# Cantrik — rust-cli template
+
+[llm]
+# provider = "ollama"

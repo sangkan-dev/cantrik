@@ -3,6 +3,7 @@ name = "cantrik-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+include = ["src/**", "templates/**", "Cargo.toml"]
 
 [[bin]]
 name = "cantrik"

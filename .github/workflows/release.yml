@@ -1,0 +1,32 @@
+name: Release binary
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build release
+        run: cargo build --release -p cantrik
+
+      - name: Upload artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/release/cantrik
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

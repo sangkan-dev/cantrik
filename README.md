@@ -10,11 +10,23 @@ Cantrik adalah CLI agent yang memahami struktur codebase Anda secara semantik, m
 - **Codebase indexing** dengan incremental updates
 
 ```bash
-# Contoh penggunaan nantinya:
-$ cantrik ask "apa fungsi dari file ini?"
-$ cantrik plan "refactor database layer"
-$ cantrik index ./src  # Index codebase
-$ cantrik --repl      # Interactive mode
+cantrik ask "apa fungsi dari file ini?"
+cantrik plan "refactor database layer"
+cantrik index ./src
+# Di terminal interaktif, tanpa subcommand: masuk REPL
+cantrik
+```
+
+### Community & hub
+
+- **Website (placeholder docs + plugin registry MVP):** [apps/cantrik-site](apps/cantrik-site/) — deploy to **`https://cantrik.sangkan.dev`**. PRD also mentions `cantrik.dev` as a possible alias/redirect.
+- **Pre-built CLI:** Linux x86_64 binary attached to [GitHub Releases](https://github.com/sangkan-dev/cantrik/releases) when you push a version tag `v*` (see `.github/workflows/release.yml`).
+
+### Bootstrap `.cantrik/` in a repo
+
+```bash
+cantrik init                    # template generic
+cantrik init --template rust-cli
 ```
 
 ---
@@ -81,7 +93,12 @@ cantrik/
 │   │   ├── sprint-task-sync/SKILL.md
 │   │   └── rust-cli-feature-delivery/SKILL.md
 │   └── workflows/
-│       └── ci.yml                  # GitHub Actions CI
+│       ├── ci.yml                  # Rust: fmt, check, clippy, test
+│       ├── cantrik-site.yml       # Svelte hub: check, lint, build
+│       └── release.yml            # Release binary on tag v*
+├── apps/
+│   ├── README.md                  # Hub domain & layout notes
+│   └── cantrik-site/              # SvelteKit static hub (Sprint 19)
 ├── prd/
 │   ├── cantrik-prd.md              # Product Requirements Document
 │   └── package.json

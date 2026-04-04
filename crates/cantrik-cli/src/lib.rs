@@ -207,6 +207,14 @@ pub async fn run() -> ExitCode {
             };
             commands::listen_cmd::run(&config, &cwd, file.clone(), raw_text.clone()).await
         }
+        Some(Command::Init { template, path }) => {
+            let root = if path.is_absolute() {
+                path.clone()
+            } else {
+                cwd.join(path)
+            };
+            commands::init_cmd::run(&root, template.as_str())
+        }
         Some(Command::Doctor) => commands::doctor::run(&cwd),
         Some(Command::Ask { query }) => {
             let config = match load_merged_config(&cwd) {
@@ -615,6 +623,27 @@ mod tests {
     fn parse_lsp_subcommand() {
         let cli = Cli::try_parse_from(["cantrik", "lsp"]).expect("parse");
         assert!(matches!(cli.cmd, Some(Command::Lsp)));
+    }
+
+    #[test]
+    fn parse_init_subcommand() {
+        let cli = Cli::try_parse_from(["cantrik", "init"]).expect("parse");
+        match &cli.cmd {
+            Some(Command::Init { template, path }) => {
+                assert_eq!(template, "generic");
+                assert_eq!(path, &std::path::PathBuf::from("."));
+            }
+            _ => panic!("expected init"),
+        }
+        let cli = Cli::try_parse_from(["cantrik", "init", "--template", "rust-cli", "/tmp/x"])
+            .expect("parse");
+        match &cli.cmd {
+            Some(Command::Init { template, path }) => {
+                assert_eq!(template, "rust-cli");
+                assert_eq!(path, &std::path::PathBuf::from("/tmp/x"));
+            }
+            _ => panic!("expected init"),
+        }
     }
 
     #[test]

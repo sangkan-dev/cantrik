@@ -14,6 +14,7 @@ pub(crate) mod file_cmd;
 pub(crate) mod fix_cmd;
 pub(crate) mod git_cmd;
 pub(crate) mod index;
+pub(crate) mod init_cmd;
 pub(crate) mod intelligence_cmd;
 pub(crate) mod listen_cmd;
 pub(crate) mod lsp_cmd;

@@ -13,6 +13,7 @@ Kami berkomitmen untuk menjaga komunitas yang welcoming dan inclusive. Semua kon
 ### Prerequisites
 - **Rust 1.70+** ([install rustup](https://rustup.rs/))
 - **Git**
+- **Node.js 20+** (hanya jika Anda mengubah hub di `apps/cantrik-site/`)
 - **Python 3.8+** (untuk PRD docs generation, optional)
 
 ### Setup Development Environment
@@ -354,9 +355,21 @@ Once approved by maintainer:
 
 ---
 
-## Release Process
+## Hub web (`apps/cantrik-site`)
 
-(To be defined as project matures)
+Situs statis SvelteKit (nuansa Sangkan / Ancient Cybernetics). CI: workflow `cantrik-site.yml`.
+
+```bash
+cd apps/cantrik-site
+npm ci
+npm run check
+npm run lint
+npm run build
+```
+
+## Release binary (GitHub)
+
+Push an annotated tag `v0.x.y` — workflow `release.yml` membangun `cantrik` (release, Linux) dan mengunggahnya ke GitHub Releases. Dokumentasikan checksum/manual verify di catatan rilis bila perlu.
 
 ---
 

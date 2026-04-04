@@ -9,6 +9,7 @@ pub mod planning;
 pub mod plugins;
 pub mod provenance;
 pub mod search;
+pub mod semantic_diff;
 pub mod session;
 pub mod skills;
 pub mod tool_system;

@@ -4,7 +4,6 @@ mod cli;
 mod commands;
 mod repl;
 
-use cli::McpCommand;
 use std::io::{self, IsTerminal, Read};
 use std::path::Path;
 use std::process::ExitCode;
@@ -13,8 +12,8 @@ use cantrik_core::config::{load_merged_config, resolve_config_paths};
 use clap::Parser;
 
 pub use cli::{
-    Cli, Command, CompletionShell, FileCommand, MacroCommand, McpCommand, SessionCommand,
-    SkillCommand,
+    Cli, Command, CompletionShell, FileCommand, MacroCommand, McpCommand, ReplayCommand,
+    SessionCommand, SkillCommand,
 };
 
 const STDIN_MAX_BYTES: u64 = 4 * 1024 * 1024;
@@ -103,6 +102,27 @@ pub async fn run() -> ExitCode {
             MacroCommand::Stop => commands::macro_cmd::stop(&cwd),
             MacroCommand::Run { label } => commands::macro_cmd::run_macro(&cwd, label),
             MacroCommand::List => commands::macro_cmd::list_macros(&cwd),
+        },
+        Some(Command::Diff {
+            staged,
+            text_only,
+            conflicts,
+        }) => commands::diff_cmd::run(&cwd, *staged, *text_only, *conflicts).await,
+        Some(Command::Handoff { message }) => {
+            commands::collab_cmd::handoff(&cwd, message.clone()).await
+        }
+        Some(Command::Export { output }) => {
+            commands::collab_cmd::export_context(&cwd, output).await
+        }
+        Some(Command::Import {
+            input,
+            seed_session,
+        }) => commands::collab_cmd::import_context(&cwd, input, *seed_session).await,
+        Some(Command::Replay { sub }) => match sub {
+            ReplayCommand::Export { output } => {
+                commands::collab_cmd::replay_export(&cwd, output).await
+            }
+            ReplayCommand::Play { file } => commands::collab_cmd::replay_play(file),
         },
         Some(Command::Doctor) => commands::doctor::run(&cwd),
         Some(Command::Ask { query }) => {
@@ -465,6 +485,69 @@ mod tests {
                 assert!(json.contains("cantrik"));
             }
             _ => panic!("expected mcp call"),
+        }
+    }
+
+    #[test]
+    fn parse_diff_handoff_replay() {
+        let cli =
+            Cli::try_parse_from(["cantrik", "diff", "--staged", "--conflicts"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Diff {
+                staged,
+                text_only,
+                conflicts,
+            } => {
+                assert!(staged);
+                assert!(!text_only);
+                assert!(conflicts);
+            }
+            _ => panic!("expected diff"),
+        }
+        let cli =
+            Cli::try_parse_from(["cantrik", "handoff", "--message", "ship it"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Handoff { message } => assert_eq!(message.as_deref(), Some("ship it")),
+            _ => panic!("expected handoff"),
+        }
+        let cli =
+            Cli::try_parse_from(["cantrik", "export", "-o", "/tmp/bundle.json"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Export { output } => {
+                assert_eq!(output, std::path::Path::new("/tmp/bundle.json"))
+            }
+            _ => panic!("expected export"),
+        }
+        let cli = Cli::try_parse_from(["cantrik", "import", "-i", "ctx.json", "--seed-session"])
+            .expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Import {
+                input,
+                seed_session,
+            } => {
+                assert_eq!(input, std::path::Path::new("ctx.json"));
+                assert!(seed_session);
+            }
+            _ => panic!("expected import"),
+        }
+        let cli =
+            Cli::try_parse_from(["cantrik", "replay", "export", "-o", "r.json"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Replay { sub } => match sub {
+                ReplayCommand::Export { output } => {
+                    assert_eq!(output, std::path::Path::new("r.json"))
+                }
+                _ => panic!("expected replay export"),
+            },
+            _ => panic!("expected replay"),
+        }
+        let cli = Cli::try_parse_from(["cantrik", "replay", "play", "s.json"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Replay { sub } => match sub {
+                ReplayCommand::Play { file } => assert_eq!(file, std::path::Path::new("s.json")),
+                _ => panic!("expected replay play"),
+            },
+            _ => panic!("expected replay"),
         }
     }
 

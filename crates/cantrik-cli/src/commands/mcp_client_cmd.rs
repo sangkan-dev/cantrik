@@ -3,10 +3,10 @@
 use std::path::Path;
 use std::process::ExitCode;
 
-use cantrik_core::llm::providers::{load_providers_toml, providers_toml_path, McpServerEntry};
+use cantrik_core::llm::providers::{McpServerEntry, load_providers_toml, providers_toml_path};
+use rmcp::ServiceExt;
 use rmcp::model::CallToolRequestParams;
 use rmcp::transport::child_process::TokioChildProcess;
-use rmcp::ServiceExt;
 
 #[derive(Debug)]
 enum McpClientCmdError {
@@ -41,10 +41,9 @@ fn find_server<'a>(
     servers: &'a [McpServerEntry],
     name: &str,
 ) -> Result<&'a McpServerEntry, McpClientCmdError> {
-    servers
-        .iter()
-        .find(|s| s.name == name)
-        .ok_or_else(|| McpClientCmdError::Server(format!("no [[mcp_client.servers]] named {name:?}")))
+    servers.iter().find(|s| s.name == name).ok_or_else(|| {
+        McpClientCmdError::Server(format!("no [[mcp_client.servers]] named {name:?}"))
+    })
 }
 
 pub async fn call_tool(
@@ -55,10 +54,9 @@ pub async fn call_tool(
 ) -> Result<(), McpClientCmdError> {
     let path = providers_toml_path();
     let prov = load_providers_toml(&path)?;
-    let section = prov
-        .mcp_client
-        .as_ref()
-        .ok_or_else(|| McpClientCmdError::Server("missing [mcp_client] in providers.toml".into()))?;
+    let section = prov.mcp_client.as_ref().ok_or_else(|| {
+        McpClientCmdError::Server("missing [mcp_client] in providers.toml".into())
+    })?;
     let entry = find_server(&section.servers, server_name)?;
 
     let mut cmd = tokio::process::Command::new(&entry.command);
@@ -68,10 +66,7 @@ pub async fn call_tool(
     cmd.stderr(std::process::Stdio::inherit());
 
     let transport = TokioChildProcess::new(cmd).map_err(McpClientCmdError::Io)?;
-    let client = ()
-        .serve(transport)
-        .await
-        .map_err(|e| McpClientCmdError::Rmcp(e.to_string()))?;
+    let client = ().serve(transport).await.map_err(|e| McpClientCmdError::Rmcp(e.to_string()))?;
 
     let v: serde_json::Value = serde_json::from_str(json_args).map_err(McpClientCmdError::Json)?;
     let obj = v
@@ -85,7 +80,10 @@ pub async fn call_tool(
         .await
         .map_err(|e| McpClientCmdError::Rmcp(e.to_string()))?;
 
-    println!("{}", serde_json::to_string_pretty(&out).unwrap_or_else(|_| format!("{out:?}")));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&out).unwrap_or_else(|_| format!("{out:?}"))
+    );
     let _ = client.cancel().await;
     Ok(())
 }

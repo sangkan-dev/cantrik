@@ -1,9 +1,8 @@
 //! Project Lua plugins under `.cantrik/plugins/*.lua` (Sprint 13, PRD §7 layer 2).
 
-use std::cell::RefCell;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use mlua::{Lua, Result as LuaResult};
 
@@ -14,13 +13,15 @@ pub fn plugins_dir(cwd: &Path) -> PathBuf {
     cwd.join(".cantrik").join("plugins")
 }
 
-fn register_cantrik(lua: &Lua, suggests: Rc<RefCell<Vec<String>>>) -> LuaResult<()> {
+fn register_cantrik(lua: &Lua, suggests: Arc<Mutex<Vec<String>>>) -> LuaResult<()> {
     let cantrik = lua.create_table()?;
     let s = suggests.clone();
     cantrik.set(
         "suggest",
         lua.create_function(move |_, msg: String| {
-            s.borrow_mut().push(msg);
+            if let Ok(mut g) = s.lock() {
+                g.push(msg);
+            }
             Ok(())
         })?,
     )?;
@@ -51,7 +52,7 @@ fn register_cantrik(lua: &Lua, suggests: Rc<RefCell<Vec<String>>>) -> LuaResult<
 
 fn run_hook_in_file(path: &Path, hook: &str, arg: &str) -> LuaResult<Vec<String>> {
     let lua = Lua::new();
-    let suggests = Rc::new(RefCell::new(Vec::<String>::new()));
+    let suggests = Arc::new(Mutex::new(Vec::<String>::new()));
     register_cantrik(&lua, suggests.clone())?;
     let src = fs::read_to_string(path)?;
     lua.load(src).set_name(path.to_string_lossy()).exec()?;
@@ -60,7 +61,7 @@ fn run_hook_in_file(path: &Path, hook: &str, arg: &str) -> LuaResult<Vec<String>
     if let Some(f) = f {
         f.call::<()>(arg)?;
     }
-    Ok(suggests.borrow().clone())
+    Ok(suggests.lock().map(|g| g.clone()).unwrap_or_default())
 }
 
 fn foreach_lua_file(cwd: &Path, mut f: impl FnMut(&Path)) {

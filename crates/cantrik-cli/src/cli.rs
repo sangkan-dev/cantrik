@@ -189,6 +189,39 @@ pub enum Command {
         #[command(subcommand)]
         sub: McpCommand,
     },
+    /// Diff working tree vs `HEAD` with optional semantic overlay from `cantrik index`.
+    Diff {
+        #[arg(long)]
+        staged: bool,
+        /// Skip symbol/caller mapping from `.cantrik/index/ast/` (unified diff only).
+        #[arg(long)]
+        text_only: bool,
+        #[arg(long)]
+        conflicts: bool,
+    },
+    /// Write `.cantrik/handoff-YYYY-MM-DD.md` from session decisions and summary.
+    Handoff {
+        #[arg(long, value_name = "TEXT")]
+        message: Option<String>,
+    },
+    /// Export lightweight context JSON (project rules, cantrik.toml, skill paths, message tail).
+    Export {
+        #[arg(short, long, value_name = "PATH")]
+        output: PathBuf,
+    },
+    /// Import a context bundle written by `cantrik export`.
+    Import {
+        #[arg(short, long, value_name = "PATH")]
+        input: PathBuf,
+        /// Append one assistant message summarizing imported message tail.
+        #[arg(long)]
+        seed_session: bool,
+    },
+    /// Session replay log: export JSON or print timeline (no tool re-execution).
+    Replay {
+        #[command(subcommand)]
+        sub: ReplayCommand,
+    },
     /// Check Cantrik installation, config, and connectivity (expanded over sprints).
     Doctor,
     /// Print shell completions to stdout (write to a file or source from your shell).
@@ -257,6 +290,20 @@ pub enum McpCommand {
         /// JSON object passed as tool arguments (default `{}`).
         #[arg(long, default_value = "{}")]
         json: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ReplayCommand {
+    /// Export recent session messages to JSON (schema version 1).
+    Export {
+        #[arg(short, long, value_name = "PATH")]
+        output: PathBuf,
+    },
+    /// Print timeline from a replay JSON file (dry replay).
+    Play {
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
     },
 }
 

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub use manifest::Manifest;
-pub use writer::{chunks_path, read_all_source_chunks};
+pub use writer::{chunks_path, graph_path, read_all_source_chunks};
 
 /// Default cap per file before skipping (1 MiB).
 pub const DEFAULT_MAX_FILE_BYTES: u64 = 1024 * 1024;

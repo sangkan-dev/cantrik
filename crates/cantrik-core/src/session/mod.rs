@@ -113,6 +113,21 @@ pub struct MessageEntry {
     pub content: String,
 }
 
+/// Message row including timestamp (replay / export).
+#[derive(Debug, Clone)]
+pub struct MessageReplayRow {
+    pub ordinal: i64,
+    pub role: String,
+    pub content: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct DecisionEntry {
+    pub text: String,
+    pub created_at: String,
+}
+
 pub async fn list_messages_after(
     pool: &SqlitePool,
     session_id: &str,
@@ -132,6 +147,57 @@ pub async fn list_messages_after(
             ordinal: row.get(0),
             role: row.get(1),
             content: row.get(2),
+        })
+        .collect())
+}
+
+/// Last `limit` messages in chronological order (by ordinal).
+pub async fn list_messages_tail_for_replay(
+    pool: &SqlitePool,
+    session_id: &str,
+    limit: i64,
+) -> Result<Vec<MessageReplayRow>, SessionError> {
+    let lim = limit.max(1);
+    let rows = sqlx::query(
+        "SELECT ordinal, role, content, created_at FROM messages WHERE session_id = ? ORDER BY ordinal DESC LIMIT ?",
+    )
+    .bind(session_id)
+    .bind(lim)
+    .fetch_all(pool)
+    .await?;
+
+    let mut out: Vec<MessageReplayRow> = rows
+        .into_iter()
+        .map(|row| MessageReplayRow {
+            ordinal: row.get(0),
+            role: row.get(1),
+            content: row.get(2),
+            created_at: row.get(3),
+        })
+        .collect();
+    out.reverse();
+    Ok(out)
+}
+
+pub async fn list_recent_decisions(
+    pool: &SqlitePool,
+    session_id: &str,
+    limit: i64,
+) -> Result<Vec<DecisionEntry>, SessionError> {
+    let lim = limit.max(1);
+    let rows = sqlx::query(
+        "SELECT text, created_at FROM session_decisions WHERE session_id = ? ORDER BY id DESC LIMIT ?",
+    )
+    .bind(session_id)
+    .bind(lim)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|row| DecisionEntry {
+            text: row.get(0),
+            created_at: row.get(1),
         })
         .collect())
 }

@@ -278,12 +278,14 @@ default_model = "llama-3.3-70b-versatile"
  
 **Goal:** Semantic Diff & Merge + Collaborative Mode PRD (§4.8, §4.23).
  
-- [ ] Output semantic diff + risk assessment + fungsi/file terdampak
-- [ ] Cek cakupan tes per perubahan — saran minimal heuristik
-- [ ] Conflict detection Git + saran resolusi
-- [ ] Export/import context (`cantrik export`, `cantrik import`)
-- [ ] Context Handoff Protocol: `cantrik handoff` → `.cantrik/handoff-YYYY-MM-DD.md` (§4.23 PRD)
-- [ ] Session Replay: simpan dan replay sesi (§4.27 PRD)
+- [x] Output semantic diff + risk assessment + fungsi/file terdampak (`cantrik diff`; overlay dari `.cantrik/index/ast/` bila ada)
+- [x] Cek cakupan tes per perubahan — saran minimal heuristik (`tests_hint` + pesan di `cantrik diff`)
+- [x] Conflict detection Git + saran resolusi (`cantrik diff --conflicts` + `git status --porcelain` / petunjuk marker)
+- [x] Export/import context (`cantrik export`, `cantrik import` — bundle JSON skema v1)
+- [x] Context Handoff Protocol: `cantrik handoff` → `.cantrik/handoff-YYYY-MM-DD.md` (UTC) (§4.23 PRD)
+- [x] Session Replay: JSON log + timeline stdout (`cantrik replay export`, `cantrik replay play`) (§4.27 PRD)
+ 
+**Batas MVP (Sprint 15):** Tanpa re-eksekusi tool/agent; tanpa call graph lintas file; tanpa resolusi konflik LLM/merge otomatis; tanpa TUI split-pane. Konfigurasi opsional `[collab]` di `cantrik.toml`: `max_files_in_report`, `replay_tail_messages`.
  
 **Definition of Done:** User bisa review ringkasan perubahan semantik sebelum apply; handoff file bisa di-generate dan di-load.
  

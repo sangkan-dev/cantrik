@@ -11,7 +11,7 @@ pub fn chunks_path(ast_dir: &Path) -> PathBuf {
     ast_dir.join("chunks.jsonl")
 }
 
-pub(crate) fn graph_path(ast_dir: &Path) -> PathBuf {
+pub fn graph_path(ast_dir: &Path) -> PathBuf {
     ast_dir.join("graph.json")
 }
 

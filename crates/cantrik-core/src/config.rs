@@ -29,6 +29,18 @@ pub struct AppConfig {
     pub background: BackgroundConfig,
     #[serde(default)]
     pub skills: SkillsConfig,
+    /// Semantic diff, handoff, export/import, replay (Sprint 15).
+    #[serde(default)]
+    pub collab: CollabConfig,
+}
+
+/// Collaboration / semantic diff limits (Sprint 15, PRD §4.8, §4.23, §4.27).
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct CollabConfig {
+    /// Cap files processed in `cantrik diff` (default 200).
+    pub max_files_in_report: Option<u32>,
+    /// Tail message count in `cantrik export` / `cantrik replay export` (default 50).
+    pub replay_tail_messages: Option<u32>,
 }
 
 /// Skill files under `.cantrik/skills/` + injection policy (Sprint 13, PRD §7).
@@ -288,6 +300,16 @@ impl AppConfig {
                 max_files: override_config.skills.max_files.or(self.skills.max_files),
                 files: merge_str_lists(&self.skills.files, &override_config.skills.files),
             },
+            collab: CollabConfig {
+                max_files_in_report: override_config
+                    .collab
+                    .max_files_in_report
+                    .or(self.collab.max_files_in_report),
+                replay_tail_messages: override_config
+                    .collab
+                    .replay_tail_messages
+                    .or(self.collab.replay_tail_messages),
+            },
         }
     }
 }
@@ -341,6 +363,14 @@ pub fn effective_skills_max_total_chars(c: &SkillsConfig) -> u64 {
 
 pub fn effective_skills_max_files(c: &SkillsConfig) -> u32 {
     c.max_files.unwrap_or(4).max(1)
+}
+
+pub fn effective_collab_max_files_in_report(c: &CollabConfig) -> usize {
+    c.max_files_in_report.unwrap_or(200).max(1) as usize
+}
+
+pub fn effective_collab_replay_tail_messages(c: &CollabConfig) -> i64 {
+    i64::from(c.replay_tail_messages.unwrap_or(50).max(1))
 }
 
 /// Whether to append provenance JSONL on successful writes.

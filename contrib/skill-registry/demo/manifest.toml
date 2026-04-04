@@ -1,0 +1,3 @@
+name = "demo"
+version = "0.1.0"
+files = ["skills/demo-tip.md"]

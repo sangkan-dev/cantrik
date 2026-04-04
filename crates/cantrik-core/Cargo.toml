@@ -38,9 +38,12 @@ tree-sitter-toml-ng = "0.7.0"
 tree-sitter-sequel = "0.3.11"
 tree-sitter-md = "0.5.3"
 lancedb = "0.27.2"
+mlua = { version = "0.11.6", features = ["lua54", "send", "vendored"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+wasmtime = { version = "43.0.0", default-features = false, features = ["runtime", "cranelift"] }
 arrow-array = "57.3.0"
 arrow-schema = "57.3.0"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+wat = "1.246.2"

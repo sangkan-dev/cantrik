@@ -245,14 +245,16 @@ default_model = "llama-3.3-70b-versatile"
  
 **Goal:** Tiga lapis PRD — skill `.md`, Lua `mlua`, WASM `wasmtime` (§7 PRD).
  
-- [ ] Auto-inject skill (`.cantrik/skills/*.md`) berdasarkan relevansi task
-- [ ] Auto-inject `.cantrik/rules.md` — always injected, berbeda dari skills (§4.19 PRD)
-- [ ] Runtime Lua (`mlua`) untuk plugin proyek — hook `on_task_start`, `after_write`, dll.
-- [ ] Runtime WASM (`wasmtime`) untuk plugin advanced — sandbox penuh
-- [ ] Perintah `cantrik skill install/list/update/remove` (registry lokal dulu)
-- [ ] Macro & Recipe System (§4.18 PRD): `cantrik macro record/stop/run`
+- [x] Auto-inject skill (`.cantrik/skills/*.md`) berdasarkan skor keyword / nama file (relevansi MVP); `[skills]` di config (`auto_inject`, `max_total_chars`, `max_files`, `files`)
+- [x] Auto-inject `.cantrik/rules.md` — selalu disisipkan di `build_llm_prompt` (kecuali `CANTRIK_NO_RULES`) — §4.19 PRD
+- [x] Runtime Lua (`mlua`) — `.cantrik/plugins/*.lua`, host `cantrik.suggest` / `log` / `warn` / `require_approval` (stub log); hook `on_task_start` (CLI `ask`), `after_write` (setelah `tool_write_file` sukses)
+- [x] Runtime WASM (`wasmtime`) — `.cantrik/plugins/*.wasm` tanpa import; panggil export `after_write_ping` jika ada (contoh WAT: `contrib/wasm/after_write_ping.wat`)
+- [x] Perintah `cantrik skill install/list/update/remove` — registry lokal `~/.local/share/cantrik/skill-registry/<name>/` + `manifest.toml`; state `.cantrik/installed-skills.toml`
+- [x] Macro (§4.18): `cantrik macro record` / `macro add -- …` / `macro stop` / `macro run` / `macro list` — file JSON di `.cantrik/macros/`
  
 **Definition of Done:** Minimal satu contoh plugin Lua dan satu WASM berjalan; rules.md selalu di-inject; satu macro bisa di-record dan di-replay.
+
+**Batas MVP (Sprint 13):** Relevansi skill hanya heuristik token (bukan embedding). Registry skill hanya lokal (bukan cantrik.dev). WASM tidak menerima path file di guest (hanya hook `after_write_ping` tanpa argumen); tidak ada WASI / akses FS host dari WASM. `cantrik.require_approval` di Lua hanya log — belum terhubung ke pipeline approval guardrails. `on_task_start` hanya dijalankan dari `cantrik ask` (bukan REPL/agents semua jalur). Macro: langkah direkam per `macro add`, bukan auto-hook shell.
  
 ---
  

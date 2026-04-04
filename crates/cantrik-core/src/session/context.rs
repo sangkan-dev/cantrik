@@ -14,6 +14,9 @@ use crate::llm;
 
 use super::list_messages_after;
 use super::load_anchors_combined;
+use crate::skills::{
+    format_rules_block, format_skills_block, load_rules_text, select_skills_for_prompt,
+};
 
 const DEFAULT_TAIL_MESSAGES: usize = 12;
 const DEFAULT_SUMMARIZE_THRESHOLD: u64 = 48_000;
@@ -117,6 +120,16 @@ pub async fn build_llm_prompt(
         ));
     }
 
+    if let Some(rules) = load_rules_text(cwd) {
+        parts.push(format_rules_block(&rules));
+    }
+
+    let skill_chunks = select_skills_for_prompt(cwd, app, current_user_line);
+    let skills_block = format_skills_block(&skill_chunks);
+    if !skills_block.is_empty() {
+        parts.push(skills_block);
+    }
+
     if let Some(s) = &sum
         && !s.text.is_empty()
     {
@@ -153,4 +166,43 @@ pub async fn build_llm_prompt(
     }
 
     Ok(body)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+    use crate::config::AppConfig;
+    use crate::session::{connect_pool, open_or_create_session};
+    use crate::skills::ENV_NO_RULES;
+
+    #[tokio::test]
+    async fn prompt_includes_project_rules() {
+        let dir = std::env::temp_dir().join(format!("cantrik-rules-prompt-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join(".cantrik")).unwrap();
+        fs::write(dir.join(".cantrik/rules.md"), "RULE_LINE_UNIQUE").unwrap();
+
+        unsafe { std::env::remove_var(ENV_NO_RULES) };
+        unsafe { std::env::set_var(crate::session::ENV_MEMORY_DB, dir.join("db.sqlite")) };
+
+        let pool = connect_pool().await.expect("pool");
+        let sid = open_or_create_session(&pool, &dir).await.expect("session");
+        let app = AppConfig::default();
+        let body = build_llm_prompt(&pool, &sid, &dir, &app, "hello")
+            .await
+            .expect("prompt");
+
+        assert!(
+            body.contains("RULE_LINE_UNIQUE"),
+            "body should contain rules: {body}"
+        );
+        assert!(body.contains("Project rules"));
+
+        unsafe {
+            std::env::remove_var(crate::session::ENV_MEMORY_DB);
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

@@ -27,6 +27,22 @@ pub struct AppConfig {
     pub agents: AgentsConfig,
     #[serde(default)]
     pub background: BackgroundConfig,
+    #[serde(default)]
+    pub skills: SkillsConfig,
+}
+
+/// Skill files under `.cantrik/skills/` + injection policy (Sprint 13, PRD §7).
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct SkillsConfig {
+    /// When false, no skill files are injected (rules.md still applies if present).
+    pub auto_inject: Option<bool>,
+    /// Max total characters for all selected skill bodies (excluding headers).
+    pub max_total_chars: Option<u64>,
+    /// Max number of skill files to include after scoring.
+    pub max_files: Option<u32>,
+    /// If non-empty after merge, only these basenames (e.g. `backend.md`) are considered.
+    #[serde(default)]
+    pub files: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -260,6 +276,18 @@ impl AppConfig {
                     .max_llm_rounds
                     .or(self.background.max_llm_rounds),
             },
+            skills: SkillsConfig {
+                auto_inject: override_config
+                    .skills
+                    .auto_inject
+                    .or(self.skills.auto_inject),
+                max_total_chars: override_config
+                    .skills
+                    .max_total_chars
+                    .or(self.skills.max_total_chars),
+                max_files: override_config.skills.max_files.or(self.skills.max_files),
+                files: merge_str_lists(&self.skills.files, &override_config.skills.files),
+            },
         }
     }
 }
@@ -301,6 +329,18 @@ pub fn effective_background_desktop_notify(c: &BackgroundConfig) -> bool {
         return v;
     }
     cfg!(any(target_os = "linux", target_os = "macos"))
+}
+
+pub fn effective_skills_auto_inject(c: &SkillsConfig) -> bool {
+    c.auto_inject.unwrap_or(true)
+}
+
+pub fn effective_skills_max_total_chars(c: &SkillsConfig) -> u64 {
+    c.max_total_chars.unwrap_or(32_000).max(512)
+}
+
+pub fn effective_skills_max_files(c: &SkillsConfig) -> u32 {
+    c.max_files.unwrap_or(4).max(1)
 }
 
 /// Whether to append provenance JSONL on successful writes.

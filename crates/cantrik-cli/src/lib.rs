@@ -11,7 +11,9 @@ use std::process::ExitCode;
 use cantrik_core::config::{load_merged_config, resolve_config_paths};
 use clap::Parser;
 
-pub use cli::{Cli, Command, CompletionShell, FileCommand, SessionCommand};
+pub use cli::{
+    Cli, Command, CompletionShell, FileCommand, MacroCommand, SessionCommand, SkillCommand,
+};
 
 const STDIN_MAX_BYTES: u64 = 4 * 1024 * 1024;
 
@@ -59,6 +61,19 @@ pub async fn run() -> ExitCode {
 
     match &cli.cmd {
         Some(Command::Completions { shell }) => commands::completions::run(*shell),
+        Some(Command::Skill { sub }) => match sub {
+            SkillCommand::Install { name } => commands::skill_cmd::install(&cwd, name),
+            SkillCommand::List => commands::skill_cmd::list_registry(),
+            SkillCommand::Remove { name } => commands::skill_cmd::remove(&cwd, name),
+            SkillCommand::Update { name } => commands::skill_cmd::update(&cwd, name),
+        },
+        Some(Command::Macro { sub }) => match sub {
+            MacroCommand::Record { label } => commands::macro_cmd::record(&cwd, label),
+            MacroCommand::Add { args } => commands::macro_cmd::add(&cwd, args),
+            MacroCommand::Stop => commands::macro_cmd::stop(&cwd),
+            MacroCommand::Run { label } => commands::macro_cmd::run_macro(&cwd, label),
+            MacroCommand::List => commands::macro_cmd::list_macros(&cwd),
+        },
         Some(Command::Doctor) => commands::doctor::run(&cwd),
         Some(Command::Ask { query }) => {
             let config = match load_merged_config(&cwd) {
@@ -195,12 +210,8 @@ pub async fn run() -> ExitCode {
         Some(Command::Background { no_notify, args }) => {
             commands::background_cmd::run(&cwd, !*no_notify, args).await
         }
-        Some(Command::Status { all, limit }) => {
-            commands::status_cmd::run(&cwd, *all, *limit).await
-        }
-        Some(Command::Daemon { poll_secs }) => {
-            commands::daemon_cmd::run(*poll_secs).await
-        }
+        Some(Command::Status { all, limit }) => commands::status_cmd::run(&cwd, *all, *limit).await,
+        Some(Command::Daemon { poll_secs }) => commands::daemon_cmd::run(*poll_secs).await,
         Some(Command::Search {
             project,
             limit,
@@ -389,7 +400,8 @@ mod tests {
 
     #[test]
     fn parse_background_resume_and_goal() {
-        let cli = Cli::try_parse_from(["cantrik", "background", "resume", "abc-uuid"]).expect("parse");
+        let cli =
+            Cli::try_parse_from(["cantrik", "background", "resume", "abc-uuid"]).expect("parse");
         match cli.cmd.expect("cmd") {
             Command::Background { no_notify, args } => {
                 assert!(!no_notify);

@@ -10,6 +10,7 @@ use thiserror::Error;
 use crate::audit;
 use crate::checkpoint;
 use crate::config::{AppConfig, effective_sandbox_level, provenance_file_enabled};
+use crate::plugins::{lua_runtime, wasm_runtime};
 use crate::provenance;
 use crate::tools::{ToolError as FileToolError, read_file_capped};
 use crate::tools::{WriteApproval, commit_write};
@@ -125,6 +126,10 @@ pub fn tool_write_file(
     if provenance_file_enabled(&config.audit) {
         let _ = provenance::append_provenance_record(project_root, &rel, config.llm.model.clone());
     }
+    for msg in lua_runtime::after_write_messages(project_root, &rel) {
+        eprintln!("plugin suggest: {msg}");
+    }
+    wasm_runtime::run_wasm_after_write_hooks(project_root);
     Ok(())
 }
 

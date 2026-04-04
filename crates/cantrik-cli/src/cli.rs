@@ -162,6 +162,16 @@ pub enum Command {
         #[arg(required = true, trailing_var_arg = true, value_name = "QUERY")]
         query: Vec<String>,
     },
+    /// Install/list/update/remove skill packages from the local registry (Sprint 13).
+    Skill {
+        #[command(subcommand)]
+        sub: SkillCommand,
+    },
+    /// Record and replay command sequences (Sprint 13, PRD §4.18).
+    Macro {
+        #[command(subcommand)]
+        sub: MacroCommand,
+    },
     /// Check Cantrik installation, config, and connectivity (expanded over sprints).
     Doctor,
     /// Print shell completions to stdout (write to a file or source from your shell).
@@ -173,6 +183,50 @@ pub enum Command {
     /// Anything that is not a known subcommand is treated as a one-shot `ask` prompt (PRD: `cantrik "..."`).
     #[command(external_subcommand)]
     External(Vec<OsString>),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SkillCommand {
+    /// Copy files from `~/.local/share/cantrik/skill-registry/<name>/` into `.cantrik/`.
+    Install {
+        #[arg(value_name = "NAME")]
+        name: String,
+    },
+    /// List package names in the local registry.
+    List,
+    /// Remove installed files tracked in `.cantrik/installed-skills.toml`.
+    Remove {
+        #[arg(value_name = "NAME")]
+        name: String,
+    },
+    /// Re-copy package files from the registry.
+    Update {
+        #[arg(value_name = "NAME")]
+        name: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum MacroCommand {
+    /// Start recording steps for a named macro.
+    Record {
+        #[arg(value_name = "LABEL")]
+        label: String,
+    },
+    /// Append one step (full argv) to the active recording.
+    Add {
+        #[arg(required = true, trailing_var_arg = true, value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    /// Save recording to `.cantrik/macros/<label>.json`.
+    Stop,
+    /// Run a saved macro by label.
+    Run {
+        #[arg(value_name = "LABEL")]
+        label: String,
+    },
+    /// List saved macro labels.
+    List,
 }
 
 #[derive(Debug, Subcommand)]

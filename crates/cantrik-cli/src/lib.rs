@@ -13,7 +13,7 @@ use clap::Parser;
 
 pub use cli::{
     Cli, Command, CompletionShell, FileCommand, MacroCommand, McpCommand, PrCommand, ReplayCommand,
-    SessionCommand, SkillCommand, TeachFormatArg, WebCommand, WorkspaceCommand,
+    SessionCommand, SkillCommand, TeachFormatArg, VisualizeCliKind, WebCommand, WorkspaceCommand,
 };
 
 const STDIN_MAX_BYTES: u64 = 4 * 1024 * 1024;
@@ -188,6 +188,19 @@ pub async fn run() -> ExitCode {
         }
         Some(Command::Fix { issue_url }) => commands::fix_cmd::run(issue_url),
         Some(Command::Web { sub }) => commands::web_cmd::run(&cwd, sub).await,
+        Some(Command::Visualize { mode, output }) => {
+            commands::visualize_cmd::run(&cwd, *mode, output.clone())
+        }
+        Some(Command::Listen { file, raw_text }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("failed to load config: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            commands::listen_cmd::run(&config, &cwd, file.clone(), raw_text.clone()).await
+        }
         Some(Command::Doctor) => commands::doctor::run(&cwd),
         Some(Command::Ask { query }) => {
             let config = match load_merged_config(&cwd) {
@@ -468,7 +481,8 @@ mod tests {
     #[test]
     fn parse_external_routes_to_freeform() {
         // Must not use a real subcommand name (e.g. `explain` is Sprint 17).
-        let cli = Cli::try_parse_from(["cantrik", "not_a_subcommand", "this", "repo"]).expect("parse");
+        let cli =
+            Cli::try_parse_from(["cantrik", "not_a_subcommand", "this", "repo"]).expect("parse");
         match cli.cmd.unwrap() {
             Command::External(parts) => {
                 assert_eq!(parts.len(), 3);
@@ -511,13 +525,31 @@ mod tests {
         .expect("parse");
         match cli.cmd.expect("cmd") {
             Command::Teach { output_dir, format } => {
-                assert_eq!(
-                    output_dir,
-                    Some(std::path::PathBuf::from(".cantrik/docs"))
-                );
+                assert_eq!(output_dir, Some(std::path::PathBuf::from(".cantrik/docs")));
                 assert_eq!(format, TeachFormatArg::Wiki);
             }
             _ => panic!("expected teach"),
+        }
+    }
+
+    #[test]
+    fn parse_visualize_and_listen() {
+        let cli = Cli::try_parse_from(["cantrik", "visualize", "dependencies", "-o", "out.mmd"])
+            .expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Visualize { mode, output } => {
+                assert_eq!(mode, VisualizeCliKind::Dependencies);
+                assert_eq!(output, Some(std::path::PathBuf::from("out.mmd")));
+            }
+            _ => panic!("expected visualize"),
+        }
+        let cli2 =
+            Cli::try_parse_from(["cantrik", "listen", "--raw-text", "hello world"]).expect("parse");
+        match cli2.cmd.expect("cmd") {
+            Command::Listen { raw_text, .. } => {
+                assert_eq!(raw_text.as_deref(), Some("hello world"));
+            }
+            _ => panic!("expected listen"),
         }
     }
 

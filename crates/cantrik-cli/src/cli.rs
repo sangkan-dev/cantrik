@@ -288,6 +288,23 @@ pub enum Command {
         #[command(subcommand)]
         sub: WebCommand,
     },
+    /// Mermaid diagram from index, layout, or `cargo tree` (Sprint 18, PRD §4.17).
+    Visualize {
+        #[arg(value_enum, default_value_t = VisualizeCliKind::Callgraph)]
+        mode: VisualizeCliKind,
+        /// Write `.mmd` (or path) instead of stdout.
+        #[arg(short, long, value_name = "PATH")]
+        output: Option<PathBuf>,
+    },
+    /// Transcribe audio via Ollama when `[ui].voice_enabled` (or use `--raw-text` for tests).
+    Listen {
+        /// Audio file to send to `{ollama}/api/transcribe`.
+        #[arg(long, value_name = "FILE")]
+        file: Option<PathBuf>,
+        /// Skip STT and run `ask` with this text (for testing without audio).
+        #[arg(long, value_name = "TEXT")]
+        raw_text: Option<String>,
+    },
     /// Check Cantrik installation, config, and connectivity (expanded over sprints).
     Doctor,
     /// Print shell completions to stdout (write to a file or source from your shell).
@@ -409,6 +426,15 @@ pub enum TeachFormatArg {
     #[default]
     Markdown,
     Wiki,
+}
+
+/// `cantrik visualize` mode (Sprint 18, PRD §4.17).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
+pub enum VisualizeCliKind {
+    #[default]
+    Callgraph,
+    Architecture,
+    Dependencies,
 }
 
 /// Shells supported by `clap_complete` for static completion scripts.

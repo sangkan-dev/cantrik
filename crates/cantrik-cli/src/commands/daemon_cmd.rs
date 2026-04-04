@@ -10,8 +10,11 @@ use cantrik_core::background::{
     notification_channels_from_config, notify_approval_needed, set_rounds_done, touch_heartbeat,
     update_job_state,
 };
-use cantrik_core::config::{effective_background_max_llm_rounds, load_merged_config};
+use cantrik_core::config::{
+    effective_background_max_llm_rounds, effective_voice_enabled, load_merged_config,
+};
 use cantrik_core::session::{SqlitePool, connect_pool, share_dir};
+use cantrik_core::voice::speak_notification;
 use fs2::FileExt;
 use tokio::time::MissedTickBehavior;
 
@@ -137,6 +140,10 @@ async fn run_one_job(pool: &SqlitePool, job: BackgroundJob) -> Result<(), Backgr
         Ok(_) => {}
         Err(e) => {
             update_job_state(pool, &job.id, JobState::Failed, Some(&e.to_string()), None).await?;
+            speak_notification(
+                effective_voice_enabled(&config.ui),
+                "Cantrik background job failed.",
+            );
             return Ok(());
         }
     }
@@ -147,6 +154,10 @@ async fn run_one_job(pool: &SqlitePool, job: BackgroundJob) -> Result<(), Backgr
 
     if rounds >= max_rounds {
         update_job_state(pool, &job.id, JobState::Completed, None, None).await?;
+        speak_notification(
+            effective_voice_enabled(&config.ui),
+            "Cantrik background job finished.",
+        );
     } else {
         let hint = format!("cantrik background resume {}", job.id);
         update_job_state(pool, &job.id, JobState::WaitingApproval, None, Some(&hint)).await?;

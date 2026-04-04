@@ -86,9 +86,27 @@ pub struct SkillsConfig {
     pub files: Vec<String>,
 }
 
+/// PRD §6 Enhancement — optional Javanese-flavoured tone hints (Sprint 18).
+#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CulturalWisdomLevel {
+    #[default]
+    Off,
+    Light,
+    Full,
+}
+
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
 pub struct UiConfig {
     pub language: Option<String>,
+    /// `off` | `light` | `full` — injects a short style block into session prompts.
+    pub cultural_wisdom: Option<CulturalWisdomLevel>,
+    /// Gate `cantrik listen` and optional TTS after background jobs (Sprint 18, PRD §4.26).
+    pub voice_enabled: Option<bool>,
+    /// Wider REPL layout: assistant + preview pane (Sprint 18, PRD §6).
+    pub tui_split_pane: Option<bool>,
+    /// Model name for Ollama `/api/transcribe` when available (default `whisper`).
+    pub transcription_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -218,6 +236,17 @@ impl AppConfig {
         AppConfig {
             ui: UiConfig {
                 language: override_config.ui.language.or(self.ui.language),
+                cultural_wisdom: override_config
+                    .ui
+                    .cultural_wisdom
+                    .or(self.ui.cultural_wisdom),
+                voice_enabled: override_config.ui.voice_enabled.or(self.ui.voice_enabled),
+                tui_split_pane: override_config.ui.tui_split_pane.or(self.ui.tui_split_pane),
+                transcription_model: override_config
+                    .ui
+                    .transcription_model
+                    .clone()
+                    .or_else(|| self.ui.transcription_model.clone()),
             },
             llm: LlmConfig {
                 provider: override_config.llm.provider.or(self.llm.provider),
@@ -427,6 +456,25 @@ pub fn effective_skills_max_total_chars(c: &SkillsConfig) -> u64 {
 
 pub fn effective_skills_max_files(c: &SkillsConfig) -> u32 {
     c.max_files.unwrap_or(4).max(1)
+}
+
+pub fn effective_cultural_wisdom(c: &UiConfig) -> CulturalWisdomLevel {
+    c.cultural_wisdom.unwrap_or(CulturalWisdomLevel::Off)
+}
+
+pub fn effective_voice_enabled(c: &UiConfig) -> bool {
+    c.voice_enabled.unwrap_or(false)
+}
+
+pub fn effective_tui_split_pane(c: &UiConfig) -> bool {
+    c.tui_split_pane.unwrap_or(false)
+}
+
+pub fn effective_transcription_model(c: &UiConfig) -> String {
+    c.transcription_model
+        .clone()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "whisper".to_string())
 }
 
 pub fn effective_collab_max_files_in_report(c: &CollabConfig) -> usize {
@@ -665,5 +713,25 @@ mod tests {
         let def = IntelligenceConfig::default();
         assert_eq!(effective_explain_max_blame_lines(&def), 200);
         assert_eq!(effective_audit_command(&def), vec!["cargo", "audit"]);
+    }
+
+    #[test]
+    fn ui_ux_fields_merge_and_effective() {
+        let base = AppConfig::default();
+        let over = AppConfig {
+            ui: UiConfig {
+                cultural_wisdom: Some(CulturalWisdomLevel::Light),
+                voice_enabled: Some(true),
+                tui_split_pane: Some(true),
+                transcription_model: Some("large-v3".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let m = base.merge(over);
+        assert_eq!(effective_cultural_wisdom(&m.ui), CulturalWisdomLevel::Light);
+        assert!(effective_voice_enabled(&m.ui));
+        assert!(effective_tui_split_pane(&m.ui));
+        assert_eq!(effective_transcription_model(&m.ui), "large-v3");
     }
 }

@@ -6,13 +6,15 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 
-use cantrik_core::config::AppConfig;
+use cantrik_core::config::{AppConfig, effective_cultural_wisdom, effective_tui_split_pane};
+use cantrik_core::cultural_wisdom;
 use cantrik_core::llm::{self, LlmError};
 use cantrik_core::session::{
     append_message, build_llm_prompt, connect_pool, load_anchors_combined, maybe_summarize_session,
     memory_db_path, message_count, open_or_create_session, project_fingerprint,
 };
 use cantrik_core::usage_ledger::{current_year_month_utc, month_spend_usd, session_spend_usd};
+use cantrik_core::visualize::{self, VisualizeKind};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::DefaultTerminal;
 use ratatui::layout::{Constraint, Layout};
@@ -34,6 +36,8 @@ enum SlashCmd {
     Doctor,
     Plan(Option<String>),
     Agents(Option<String>),
+    /// Optional tail: callgraph | architecture | dependencies
+    Visualize(Option<String>),
     Help,
     Exit,
     Unknown(String),
@@ -59,6 +63,8 @@ struct ReplState {
     thinking: VecDeque<String>,
     /// Full transcript of assistant replies (for tail display).
     output: String,
+    /// Last `/visualize` output (shown in split-pane preview).
+    preview: String,
     busy: bool,
     mem: Option<ReplMemory>,
 }
@@ -71,6 +77,7 @@ impl ReplState {
             hist_cursor: None,
             thinking: VecDeque::new(),
             output: String::new(),
+            preview: String::new(),
             busy: false,
             mem,
         }
@@ -119,7 +126,7 @@ fn run_loop(
     }
 
     loop {
-        terminal.draw(|frame| ui(frame, &state))?;
+        terminal.draw(|frame| ui(frame, &state, &config))?;
 
         while let Ok(msg) = rx_llm.try_recv() {
             match msg {
@@ -241,8 +248,23 @@ fn handle_line(
             SlashCmd::Exit => return Ok(true),
             SlashCmd::Help => {
                 state.push_thinking(
-                    "/cost · /memory · /plan · /agents <goal> · /doctor · /exit — try /help",
+                    "/cost · /memory · /plan · /agents · /visualize [callgraph|architecture|dependencies] · /doctor · /exit",
                 );
+            }
+            SlashCmd::Visualize(tail) => {
+                let kind = visualize_kind_from_tail(tail.as_deref());
+                match visualize::render_visualize_kind(kind, cwd) {
+                    Ok(text) => {
+                        state.preview = text.clone();
+                        state.output.push_str("\n--- visualize ---\n");
+                        state.output.push_str(&text);
+                        state.output.push('\n');
+                        state.push_thinking(format!(
+                            "visualize: {kind:?} (enable [ui] tui_split_pane for side preview)."
+                        ));
+                    }
+                    Err(e) => state.push_thinking(format!("visualize: {e}")),
+                }
             }
             SlashCmd::Cost => {
                 let fp = project_fingerprint(cwd);
@@ -409,7 +431,11 @@ fn handle_line(
             }
         }
     } else {
-        prompt.clone()
+        let p = prompt.clone();
+        match cultural_wisdom::prompt_addon(effective_cultural_wisdom(&config.ui)) {
+            Some(cw) => format!("{cw}\n\nuser: {p}\n"),
+            None => p,
+        }
     };
 
     let cfg = config.clone();
@@ -446,6 +472,20 @@ fn handle_line(
     Ok(false)
 }
 
+fn visualize_kind_from_tail(tail: Option<&str>) -> VisualizeKind {
+    match tail
+        .map(str::trim)
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "architecture" | "arch" => VisualizeKind::Architecture,
+        "dependencies" | "deps" => VisualizeKind::Dependencies,
+        "" | "callgraph" | "graph" => VisualizeKind::Callgraph,
+        _ => VisualizeKind::Callgraph,
+    }
+}
+
 fn parse_slash(line: &str) -> Option<SlashCmd> {
     let t = line.trim();
     if !t.starts_with('/') {
@@ -472,13 +512,18 @@ fn parse_slash(line: &str) -> Option<SlashCmd> {
         } else {
             Some(tail.to_string())
         }),
+        "visualize" | "viz" => SlashCmd::Visualize(if tail.is_empty() {
+            None
+        } else {
+            Some(tail.to_string())
+        }),
         "help" | "?" => SlashCmd::Help,
         "exit" | "quit" => SlashCmd::Exit,
         other => SlashCmd::Unknown(other.to_string()),
     })
 }
 
-fn ui(frame: &mut ratatui::Frame, state: &ReplState) {
+fn ui(frame: &mut ratatui::Frame, state: &ReplState, config: &AppConfig) {
     let vertical = Layout::vertical([
         Constraint::Length(10),
         Constraint::Min(4),
@@ -505,14 +550,35 @@ fn ui(frame: &mut ratatui::Frame, state: &ReplState) {
     let think = List::new(thinking_items).block(think_block);
     frame.render_widget(think, thinking_area);
 
-    let visible = main_area.height.saturating_sub(2) as usize;
-    let main_text = tail_lines(&state.output, visible.max(1));
-    let main_block = Block::default()
-        .borders(Borders::ALL)
-        .title(" assistant (streaming) ")
-        .border_style(Style::default().fg(Color::Cyan));
-    let main_para = Paragraph::new(main_text).block(main_block);
-    frame.render_widget(main_para, main_area);
+    if effective_tui_split_pane(&config.ui) {
+        let h = Layout::horizontal([Constraint::Percentage(58), Constraint::Percentage(42)]);
+        let [assistant_area, preview_area] = h.areas(main_area);
+        let vis_a = assistant_area.height.saturating_sub(2) as usize;
+        let main_text = tail_lines(&state.output, vis_a.max(1));
+        let main_block = Block::default()
+            .borders(Borders::ALL)
+            .title(" assistant (streaming) ")
+            .border_style(Style::default().fg(Color::Cyan));
+        let main_para = Paragraph::new(main_text).block(main_block);
+        frame.render_widget(main_para, assistant_area);
+        let vis_p = preview_area.height.saturating_sub(2) as usize;
+        let prev_text = tail_lines(&state.preview, vis_p.max(1));
+        let prev_block = Block::default()
+            .borders(Borders::ALL)
+            .title(" preview / visualize ")
+            .border_style(Style::default().fg(Color::Magenta));
+        let prev_para = Paragraph::new(prev_text).block(prev_block);
+        frame.render_widget(prev_para, preview_area);
+    } else {
+        let visible = main_area.height.saturating_sub(2) as usize;
+        let main_text = tail_lines(&state.output, visible.max(1));
+        let main_block = Block::default()
+            .borders(Borders::ALL)
+            .title(" assistant (streaming) ")
+            .border_style(Style::default().fg(Color::Cyan));
+        let main_para = Paragraph::new(main_text).block(main_block);
+        frame.render_widget(main_para, main_area);
+    }
 
     let busy = if state.busy { " [busy]" } else { "" };
     let input_block = Block::default()
@@ -542,6 +608,10 @@ mod tests {
         assert!(matches!(parse_slash("/doctor"), Some(SlashCmd::Doctor)));
         assert!(matches!(parse_slash("/exit"), Some(SlashCmd::Exit)));
         assert!(matches!(parse_slash("/help"), Some(SlashCmd::Help)));
+        assert!(matches!(
+            parse_slash("/visualize architecture"),
+            Some(SlashCmd::Visualize(Some(s))) if s == "architecture"
+        ));
         assert!(matches!(
             parse_slash("/nope"),
             Some(SlashCmd::Unknown(x)) if x == "nope"

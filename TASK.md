@@ -328,13 +328,15 @@ default_model = "llama-3.3-70b-versatile"
  
 **Goal:** LSP + Visual Intelligence + Voice + TUI enhancements PRD (§4.16–4.17, §4.26, §6 Enhancement).
  
-- [ ] Voice-to-Code: `cantrik listen` via Whisper lokal (Ollama) — opt-in (§4.26 PRD)
-- [ ] TTS notifikasi untuk background task — opt-in
-- [ ] `/visualize [callgraph|architecture|dependencies]` → Mermaid/PlantUML di TUI atau export file (§4.17 PRD)
-- [ ] LSP server mode — Cantrik sebagai Language Server untuk Neovim / VS Code / Helix (§4.16 PRD)
-- [ ] TUI Split Pane: thinking log | code preview | semantic diff | approval panel (§6 Enhancement PRD)
-- [ ] Cultural Wisdom Mode: `cultural_wisdom = "light"` / `"full"` (§6 Enhancement PRD)
-- [ ] Multi-root Workspace: support monorepo / beberapa project folder
+- [x] Voice-to-Code: `cantrik listen` — opt-in `[ui] voice_enabled`; audio → Ollama `/api/transcribe` bila tersedia; `--raw-text` untuk uji tanpa audio (§4.26 PRD)
+- [x] TTS notifikasi untuk background task — opt-in (`voice_enabled` + `espeak` / `say` pada Linux/macOS)
+- [x] `/visualize` + `cantrik visualize` → Mermaid (callgraph dari indeks, architecture dari tree dir, dependencies dari `cargo tree`); export `--output` (§4.17 PRD)
+- [ ] LSP server mode (`cantrik lsp`) — **ditunda fase 2** (subset PRD §4.16; prioritas sprint: visual + UX config)
+- [x] TUI split pane — `[ui] tui_split_pane`: assistant + panel preview (`/visualize`); panel “semantic diff / approval” penuh ditunda (§6 Enhancement PRD)
+- [x] Cultural Wisdom Mode: `[ui] cultural_wisdom = "off" | "light" | "full"` — injeksi ke `build_llm_prompt` + REPL tanpa sesi (§6 Enhancement PRD)
+- [ ] Multi-root workspace — **ditunda** (fase 2; risiko fingerprint/sesi)
+ 
+**Batas MVP (Sprint 18):** Tanpa PlantUML generator; tanpa LSP; callgraph hanya intra-file dari `graph.json`; STT bergantung build Ollama yang mendukung `/api/transcribe` + model whisper. Konfigurasi `[ui]`: `cultural_wisdom`, `voice_enabled`, `tui_split_pane`, `transcription_model`.
  
 **Definition of Done:** Minimal satu alur voice atau visual atau LSP teruji end-to-end; cultural wisdom mode bisa dikonfigurasi.
  
@@ -344,7 +346,7 @@ default_model = "llama-3.3-70b-versatile"
  
 **Goal:** Phase 4 — Ecosystem PRD.
  
-- [ ] Hub/website `cantrik.dev` (placeholder dokumentasi + registry plugin)
+- [ ] Hub/website `cantrik.sangkan.dev` (placeholder dokumentasi + registry plugin)
 - [ ] `cantrik init --template <name>` — bootstrap project dengan template per framework
 - [ ] Air-gapped / enterprise offline mode — 100% lokal, tanpa cloud sama sekali
 - [ ] Packaging: Homebrew, deb/apt, pacman, Nix flake, winget (bertahap)

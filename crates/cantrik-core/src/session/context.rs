@@ -4,7 +4,8 @@ use std::path::Path;
 
 use sqlx::SqlitePool;
 
-use crate::config::AppConfig;
+use crate::config::{AppConfig, effective_cultural_wisdom};
+use crate::cultural_wisdom;
 
 use super::{
     ENV_NO_SUMMARY, MessageEntry, SessionError, latest_summary, list_all_messages_ordered,
@@ -136,6 +137,10 @@ pub async fn build_llm_prompt(
         parts.push(skills_block);
     }
 
+    if let Some(block) = cultural_wisdom::prompt_addon(effective_cultural_wisdom(&app.ui)) {
+        parts.push(block);
+    }
+
     if let Some(s) = &sum
         && !s.text.is_empty()
     {
@@ -179,7 +184,7 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::config::AppConfig;
+    use crate::config::{AppConfig, CulturalWisdomLevel};
     use crate::session::{connect_pool, open_or_create_session};
     use crate::skills::ENV_NO_RULES;
 
@@ -205,6 +210,33 @@ mod tests {
             "body should contain rules: {body}"
         );
         assert!(body.contains("Project rules"));
+
+        unsafe {
+            std::env::remove_var(crate::session::ENV_MEMORY_DB);
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn prompt_includes_cultural_wisdom_when_enabled() {
+        let dir = std::env::temp_dir().join(format!("cantrik-cw-prompt-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join(".cantrik")).unwrap();
+
+        unsafe { std::env::set_var(crate::session::ENV_MEMORY_DB, dir.join("db.sqlite")) };
+
+        let pool = connect_pool().await.expect("pool");
+        let sid = open_or_create_session(&pool, &dir).await.expect("session");
+        let mut app = AppConfig::default();
+        app.ui.cultural_wisdom = Some(CulturalWisdomLevel::Light);
+        let body = build_llm_prompt(&pool, &sid, &dir, &app, "hello")
+            .await
+            .expect("prompt");
+
+        assert!(
+            body.contains("cultural wisdom"),
+            "expected cultural block in {body}"
+        );
 
         unsafe {
             std::env::remove_var(crate::session::ENV_MEMORY_DB);

@@ -6,7 +6,7 @@ use cantrik_core::config::AppConfig;
 use cantrik_core::llm::{self, LlmError};
 use cantrik_core::session::{
     self, append_message, build_llm_prompt, connect_pool, maybe_summarize_session,
-    open_or_create_session,
+    open_or_create_session, project_fingerprint,
 };
 
 #[derive(Debug)]
@@ -51,11 +51,23 @@ pub async fn stream_with_session(
     append_message(&pool, &sid, "user", user_prompt).await?;
 
     let full_prompt = build_llm_prompt(&pool, &sid, cwd, config, user_prompt).await?;
+    let fp = project_fingerprint(cwd);
+    let usage = llm::LlmUsageContext {
+        pool: &pool,
+        session_id: Some(&sid),
+        project_fingerprint: &fp,
+    };
     let mut assistant = String::new();
-    llm::ask_stream_chunks(config, &full_prompt, &mut |s| {
-        assistant.push_str(s);
-        on_chunk(s)
-    })
+    llm::ask_stream_chunks_with(
+        config,
+        &full_prompt,
+        Some(user_prompt),
+        Some(usage),
+        &mut |s| {
+            assistant.push_str(s);
+            on_chunk(s)
+        },
+    )
     .await?;
     append_message(&pool, &sid, "assistant", &assistant).await?;
     Ok(())

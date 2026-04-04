@@ -172,6 +172,23 @@ pub enum Command {
         #[command(subcommand)]
         sub: MacroCommand,
     },
+    /// Approximate LLM spend (UTC calendar month + active session for this cwd).
+    Cost {
+        /// Only print spend for the current SQLite session (latest for project fingerprint).
+        #[arg(long)]
+        session_only: bool,
+    },
+    /// Local server modes (MCP stdio).
+    Serve {
+        /// Run MCP server over stdio (JSON-RPC). Project config is loaded from cwd.
+        #[arg(long)]
+        mcp: bool,
+    },
+    /// Interact with external MCP servers listed in `providers.toml` under `[mcp_client]`.
+    Mcp {
+        #[command(subcommand)]
+        sub: McpCommand,
+    },
     /// Check Cantrik installation, config, and connectivity (expanded over sprints).
     Doctor,
     /// Print shell completions to stdout (write to a file or source from your shell).
@@ -227,6 +244,20 @@ pub enum MacroCommand {
     },
     /// List saved macro labels.
     List,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum McpCommand {
+    /// Invoke a tool on a named `[[mcp_client.servers]]` entry (spawns stdio child).
+    Call {
+        #[arg(value_name = "SERVER")]
+        server: String,
+        #[arg(value_name = "TOOL")]
+        tool: String,
+        /// JSON object passed as tool arguments (default `{}`).
+        #[arg(long, default_value = "{}")]
+        json: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]

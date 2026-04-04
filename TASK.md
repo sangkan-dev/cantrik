@@ -106,7 +106,7 @@ default_model = "llama-3.3-70b-versatile"
 
 **Definition of Done:** REPL bisa sesi percakapan singkat dengan log dan tiga perintah di atas.
 
-**Catatan:** `/cost` dan `/memory` berupa stub/jelasan tier sesuai PRD (pelacakan biaya nyata di Sprint 14+; persistensi memori di Sprint 6–7). `/doctor` memakai `doctor::report_lines` yang sama dengan subcommand `cantrik doctor`.
+**Catatan:** `/memory` menjelaskan tier DB + anchors; pelacakan biaya memakai `/cost` atau `cantrik cost` (Sprint 14). `/doctor` memakai `doctor::report_lines` yang sama dengan subcommand `cantrik doctor`.
 
 ---
 
@@ -262,13 +262,15 @@ default_model = "llama-3.3-70b-versatile"
  
 **Goal:** Smart Routing + Cost Control + MCP Integration PRD (§3, §4.9).
  
-- [ ] Routing model otomatis berdasarkan task complexity (simple/medium/complex threshold)
-- [ ] Budget: `max_cost_per_session` dan `max_cost_per_month` dari config
-- [ ] `/cost` command — tampilkan usage & biaya real per session + bulan ini
-- [ ] `cantrik serve --mcp` — Cantrik sebagai MCP server
-- [ ] Konsumsi MCP server eksternal (GitHub MCP, Postgres MCP, dll.) sebagai client
+- [x] Routing model otomatis berdasarkan task complexity (simple/medium/complex threshold)
+- [x] Budget: `max_cost_per_session` dan `max_cost_per_month` dari config
+- [x] `/cost` command — tampilkan usage & biaya real per session + bulan ini
+- [x] `cantrik serve --mcp` — Cantrik sebagai MCP server
+- [x] Konsumsi MCP server eksternal (GitHub MCP, Postgres MCP, dll.) sebagai client
  
 **Definition of Done:** Cantrik bisa dipanggil dari host MCP dan memanggil tools MCP lain; routing model berfungsi sesuai threshold.
+
+**Batas MVP Sprint 14:** Biaya = **perkiraan** dari panjang UTF-8 + tabel harga statis per provider/model (`llm/cost.rs`); token nyata dari API belum dipakai. `auto_route` mengganti **target pertama** rantai LLM bila `[routing].auto_route` + `[routing.thresholds]` ada dan `routing_prompt` diset (REPL/`ask` memakai teks user; ringkasan internal memakai `routing_prompt: None`). Budget melebihi cap → error `LlmError::BudgetExceeded` (bukan fallback otomatis). MCP: crate **`rmcp` 1.3** (stdio server + child-process client); tool server `cantrik_ask`; client CLI `cantrik mcp call <server> <tool> --json '{}'`. Registrasi tool MCP di `tool_system` / resources penuh → sprint berikutnya.
  
 ---
  

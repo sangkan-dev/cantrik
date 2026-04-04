@@ -4,6 +4,7 @@ mod cli;
 mod commands;
 mod repl;
 
+use cli::McpCommand;
 use std::io::{self, IsTerminal, Read};
 use std::path::Path;
 use std::process::ExitCode;
@@ -12,7 +13,8 @@ use cantrik_core::config::{load_merged_config, resolve_config_paths};
 use clap::Parser;
 
 pub use cli::{
-    Cli, Command, CompletionShell, FileCommand, MacroCommand, SessionCommand, SkillCommand,
+    Cli, Command, CompletionShell, FileCommand, MacroCommand, McpCommand, SessionCommand,
+    SkillCommand,
 };
 
 const STDIN_MAX_BYTES: u64 = 4 * 1024 * 1024;
@@ -60,6 +62,34 @@ pub async fn run() -> ExitCode {
     }
 
     match &cli.cmd {
+        Some(Command::Cost { session_only }) => commands::cost_cmd::run(&cwd, *session_only).await,
+        Some(Command::Serve { mcp }) => {
+            if !*mcp {
+                eprintln!(
+                    "cantrik serve: use --mcp for MCP over stdio (cwd = project root for config)."
+                );
+                return ExitCode::from(2);
+            }
+            let config = match load_merged_config(&cwd) {
+                Ok(config) => config,
+                Err(error) => {
+                    eprintln!("failed to load config: {error}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            return commands::serve_mcp::run_mcp_stdio(config).await;
+        }
+        Some(Command::Mcp { sub }) => match sub {
+            McpCommand::Call { server, tool, json } => {
+                return commands::mcp_client_cmd::run_call(
+                    &cwd,
+                    server.clone(),
+                    tool.clone(),
+                    json.clone(),
+                )
+                .await;
+            }
+        },
         Some(Command::Completions { shell }) => commands::completions::run(*shell),
         Some(Command::Skill { sub }) => match sub {
             SkillCommand::Install { name } => commands::skill_cmd::install(&cwd, name),
@@ -395,6 +425,46 @@ mod tests {
                 assert!(path.is_none());
             }
             _ => panic!("expected index"),
+        }
+    }
+
+    #[test]
+    fn parse_cost_and_serve_mcp() {
+        let cli = Cli::try_parse_from(["cantrik", "cost"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Cost { session_only } => assert!(!session_only),
+            _ => panic!("expected cost"),
+        }
+        let cli = Cli::try_parse_from(["cantrik", "cost", "--session-only"]).expect("parse");
+        assert!(matches!(
+            cli.cmd,
+            Some(Command::Cost { session_only: true })
+        ));
+        let cli = Cli::try_parse_from(["cantrik", "serve", "--mcp"]).expect("parse");
+        assert!(matches!(cli.cmd, Some(Command::Serve { mcp: true })));
+    }
+
+    #[test]
+    fn parse_mcp_call() {
+        let cli = Cli::try_parse_from([
+            "cantrik",
+            "mcp",
+            "call",
+            "github",
+            "search_repositories",
+            "--json",
+            r#"{"q":"cantrik"}"#,
+        ])
+        .expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Mcp {
+                sub: McpCommand::Call { server, tool, json },
+            } => {
+                assert_eq!(server, "github");
+                assert_eq!(tool, "search_repositories");
+                assert!(json.contains("cantrik"));
+            }
+            _ => panic!("expected mcp call"),
         }
     }
 

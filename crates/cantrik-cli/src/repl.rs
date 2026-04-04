@@ -10,8 +10,9 @@ use cantrik_core::config::AppConfig;
 use cantrik_core::llm::{self, LlmError};
 use cantrik_core::session::{
     append_message, build_llm_prompt, connect_pool, load_anchors_combined, maybe_summarize_session,
-    memory_db_path, message_count, open_or_create_session,
+    memory_db_path, message_count, open_or_create_session, project_fingerprint,
 };
+use cantrik_core::usage_ledger::{current_year_month_utc, month_spend_usd, session_spend_usd};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::DefaultTerminal;
 use ratatui::layout::{Constraint, Layout};
@@ -244,19 +245,46 @@ fn handle_line(
                 );
             }
             SlashCmd::Cost => {
-                let p = config.llm.provider.as_deref().unwrap_or("(unset)");
-                let m = config
-                    .llm
-                    .model
-                    .as_deref()
-                    .unwrap_or("(default from providers.toml)");
-                state.push_thinking(
-                    "/cost: (stub) session & monthly tracking not implemented yet (see Sprint 14)."
-                        .to_string(),
-                );
-                state.push_thinking(format!(
-                    "  active target from config: provider={p} model={m}"
-                ));
+                let fp = project_fingerprint(cwd);
+                let ym = current_year_month_utc();
+                let fut = async {
+                    let pool = if let Some(m) = &state.mem {
+                        m.pool.clone()
+                    } else {
+                        connect_pool()
+                            .await
+                            .map_err(|e: cantrik_core::session::SessionError| e.to_string())?
+                    };
+                    let month = month_spend_usd(&pool, &fp, &ym)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if let Some(m) = &state.mem {
+                        let s = session_spend_usd(&pool, &fp, &m.session_id)
+                            .await
+                            .map_err(|e| e.to_string())?;
+                        Ok::<_, String>((Some(s), month))
+                    } else {
+                        Ok((None, month))
+                    }
+                };
+                match rt.block_on(fut) {
+                    Ok((Some(s), month)) => {
+                        state.push_thinking(format!("approx session spend: {s:.6} USD"));
+                        state.push_thinking(format!(
+                            "approx month ({ym}, UTC, this project): {month:.6} USD"
+                        ));
+                    }
+                    Ok((None, month)) => {
+                        state.push_thinking(
+                            "no active REPL session — open one by sending a message first."
+                                .to_string(),
+                        );
+                        state.push_thinking(format!(
+                            "approx month ({ym}, UTC, this project): {month:.6} USD"
+                        ));
+                    }
+                    Err(e) => state.push_thinking(format!("/cost: {e}")),
+                }
             }
             SlashCmd::Memory => {
                 state.push_thinking(format!("Tier2 DB: {}", memory_db_path().display()));
@@ -389,13 +417,28 @@ fn handle_line(
     let tx_done = tx_llm.clone();
     let acc = Arc::new(Mutex::new(String::new()));
     let acc2 = acc.clone();
+    let fp = project_fingerprint(cwd);
     rt.spawn(async move {
-        let r = llm::ask_stream_chunks(&cfg, &full_prompt, &mut |s| {
-            let _ = tx_chunk.send(LlmUiMsg::Chunk(s.to_string()));
-            acc2.lock().expect("acc").push_str(s);
-            Ok(())
-        })
-        .await;
+        let r = if let Some((ref pool, ref session_id)) = mem {
+            let usage = llm::LlmUsageContext {
+                pool,
+                session_id: Some(session_id.as_str()),
+                project_fingerprint: &fp,
+            };
+            llm::ask_stream_chunks_with(&cfg, &full_prompt, Some(&prompt), Some(usage), &mut |s| {
+                let _ = tx_chunk.send(LlmUiMsg::Chunk(s.to_string()));
+                acc2.lock().expect("acc").push_str(s);
+                Ok(())
+            })
+            .await
+        } else {
+            llm::ask_stream_chunks_with(&cfg, &full_prompt, Some(&prompt), None, &mut |s| {
+                let _ = tx_chunk.send(LlmUiMsg::Chunk(s.to_string()));
+                acc2.lock().expect("acc").push_str(s);
+                Ok(())
+            })
+            .await
+        };
         let body = acc.lock().expect("acc").clone();
         let _ = tx_done.send(LlmUiMsg::Done(r.map_err(|e: LlmError| e.to_string()), body));
     });

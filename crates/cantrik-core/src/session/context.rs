@@ -91,7 +91,13 @@ pub async fn maybe_summarize_session(
         block
     );
 
-    let summary_text = llm::ask_complete_text(app, &prompt)
+    let fp = super::project_fingerprint(_cwd);
+    let usage = llm::LlmUsageContext {
+        pool,
+        session_id: Some(session_id),
+        project_fingerprint: &fp,
+    };
+    let summary_text = llm::ask_complete_text_with(app, &prompt, None, Some(usage))
         .await
         .map_err(|e| SessionError::Llm(e.to_string()))?;
 

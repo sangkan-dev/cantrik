@@ -73,6 +73,8 @@ pub struct ProvidersToml {
     pub providers: ProviderSections,
     #[serde(default)]
     pub routing: Option<RoutingSection>,
+    #[serde(default)]
+    pub mcp_client: Option<McpClientSection>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -154,10 +156,47 @@ fn default_ollama_base() -> String {
     "http://127.0.0.1:11434".to_string()
 }
 
+/// Optional per-tier route strings (`provider/model` or `provider`), used when `auto_route = true`.
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct RoutingThresholds {
+    #[serde(default)]
+    pub simple: Option<String>,
+    #[serde(default)]
+    pub medium: Option<String>,
+    #[serde(default)]
+    pub complex: Option<String>,
+}
+
 #[derive(Debug, Deserialize, Default)]
 pub struct RoutingSection {
     #[serde(default)]
     pub fallback_chain: Vec<String>,
+    /// When true and `[routing.thresholds]` is set, replace the first attempt target using the
+    /// tier derived from `routing_prompt` (see `build_attempt_chain`).
+    #[serde(default)]
+    pub auto_route: bool,
+    /// Approximate USD budget per SQLite session (optional).
+    #[serde(default)]
+    pub max_cost_per_session: Option<f64>,
+    /// Approximate UTC calendar-month budget per project fingerprint (optional).
+    #[serde(default)]
+    pub max_cost_per_month: Option<f64>,
+    #[serde(default)]
+    pub thresholds: Option<RoutingThresholds>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct McpClientSection {
+    #[serde(default)]
+    pub servers: Vec<McpServerEntry>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct McpServerEntry {
+    pub name: String,
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
 }
 
 #[derive(Debug, Error)]
@@ -461,6 +500,18 @@ pub fn parse_route_entry(
     Ok((kind, model))
 }
 
+/// Resolve a single routing line to a concrete model (defaults from `providers.toml` when omitted).
+pub fn route_entry_to_target(
+    entry: &str,
+    providers: &ProvidersToml,
+) -> Result<ProviderTarget, ProvidersLoadError> {
+    let (kind, model_opt) = parse_route_entry(entry)?;
+    let model = model_opt
+        .or_else(|| resolve_default_model(kind, providers))
+        .ok_or(ProvidersLoadError::NoTargets)?;
+    Ok(ProviderTarget { kind, model })
+}
+
 /// Build ordered unique targets: primary from `cantrik.toml` `[llm]`, then `[routing].fallback_chain`.
 pub fn build_attempt_chain(
     app_llm_provider: Option<&str>,
@@ -547,7 +598,9 @@ mod tests {
                     "gemini/m-g2".into(),
                     "ollama".into(), // uses default m-o
                 ],
+                ..Default::default()
             }),
+            mcp_client: None,
         };
         let chain = build_attempt_chain(Some("anthropic"), None, &prov).expect("chain");
         assert_eq!(
@@ -600,7 +653,9 @@ mod tests {
             },
             routing: Some(RoutingSection {
                 fallback_chain: vec!["ollama".into()],
+                ..Default::default()
             }),
+            mcp_client: None,
         };
         let chain = build_attempt_chain(None, None, &prov).expect("chain");
         assert_eq!(

@@ -11,6 +11,12 @@ pub enum ToolId {
     Search,
     Git,
     WebFetch,
+    /// DuckDuckGo HTML search (Sprint 16, PRD §4.13).
+    WebSearch,
+    /// GET URL (same as web_fetch; separate id for guardrails).
+    BrowsePage,
+    /// GET documentation URL (alias of browse; separate id).
+    FetchDocs,
 }
 
 impl ToolId {
@@ -22,13 +28,21 @@ impl ToolId {
             Self::Search => "search",
             Self::Git => "git",
             Self::WebFetch => "web_fetch",
+            Self::WebSearch => "web_search",
+            Self::BrowsePage => "browse_page",
+            Self::FetchDocs => "fetch_docs",
         }
     }
 
     fn builtin_tier(self) -> PermissionTier {
         match self {
             Self::ReadFile | Self::Search | Self::Git => PermissionTier::AutoApprove,
-            Self::WriteFile | Self::RunCommand | Self::WebFetch => PermissionTier::RequireApproval,
+            Self::WriteFile
+            | Self::RunCommand
+            | Self::WebFetch
+            | Self::WebSearch
+            | Self::BrowsePage
+            | Self::FetchDocs => PermissionTier::RequireApproval,
         }
     }
 }

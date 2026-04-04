@@ -1,0 +1,11 @@
+#!/bin/sh
+# Sample git pre-commit hook: optional LLM review before commit.
+# Install: cp contrib/git-hooks/pre-commit-review.sample .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# Uses `cantrik review` (staged diff). Use --soft to never block commits on LLM errors.
+
+set -e
+if ! command -v cantrik >/dev/null 2>&1; then
+  exit 0
+fi
+# --soft: do not fail the commit if the LLM call errors (network, quota, etc.).
+cantrik review --soft

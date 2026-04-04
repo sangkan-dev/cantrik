@@ -14,6 +14,7 @@ use crate::plugins::{lua_runtime, wasm_runtime};
 use crate::provenance;
 use crate::tools::{ToolError as FileToolError, read_file_capped};
 use crate::tools::{WriteApproval, commit_write};
+use url::Url;
 
 use super::approvals::{ExecApproval, NetworkApproval};
 use super::forbidden::check_exec_argv;
@@ -202,20 +203,17 @@ pub fn tool_git(
     cmd.output().map_err(ToolSystemError::Io)
 }
 
-/// HTTP GET with response size cap. Requires `NetworkApproval`.
-pub async fn tool_web_fetch(
-    config: &AppConfig,
-    url: &str,
-    max_bytes: u64,
-    _approval: NetworkApproval,
-) -> Result<Vec<u8>, ToolSystemError> {
-    require_not_forbidden(config, ToolId::WebFetch)?;
+async fn http_get_capped(url: &str, max_bytes: u64) -> Result<Vec<u8>, ToolSystemError> {
     let client = Client::builder()
         .timeout(Duration::from_secs(60))
         .build()
         .map_err(|e| ToolSystemError::Http(e.to_string()))?;
     let res = client
         .get(url)
+        .header(
+            "User-Agent",
+            "cantrik/0.1 (https://github.com/sangkan/cantrik; web research MVP)",
+        )
         .send()
         .await
         .map_err(|e| ToolSystemError::Http(e.to_string()))?;
@@ -238,9 +236,97 @@ pub async fn tool_web_fetch(
             "response body exceeds {max_bytes} bytes"
         )));
     }
+    Ok(body.to_vec())
+}
+
+/// HTTP GET with response size cap. Requires `NetworkApproval`.
+pub async fn tool_web_fetch(
+    config: &AppConfig,
+    url: &str,
+    max_bytes: u64,
+    approval: NetworkApproval,
+) -> Result<Vec<u8>, ToolSystemError> {
+    require_not_forbidden(config, ToolId::WebFetch)?;
+    let body = http_get_capped(url, max_bytes).await?;
     let line = audit::format_fetch_audit(url, body.len());
     let _ = audit::append_audit_line(line.trim_end());
-    Ok(body.to_vec())
+    let _ = approval;
+    Ok(body)
+}
+
+/// Same as [`tool_web_fetch`] but checked against `browse_page` guardrails.
+pub async fn tool_browse_page(
+    config: &AppConfig,
+    url: &str,
+    max_bytes: u64,
+    approval: NetworkApproval,
+) -> Result<Vec<u8>, ToolSystemError> {
+    require_not_forbidden(config, ToolId::BrowsePage)?;
+    let body = http_get_capped(url, max_bytes).await?;
+    let line = audit::format_fetch_audit(url, body.len());
+    let _ = audit::append_audit_line(line.trim_end());
+    let _ = approval;
+    Ok(body)
+}
+
+/// Same as [`tool_browse_page`] for documentation URLs (`fetch_docs` tool id).
+pub async fn tool_fetch_docs(
+    config: &AppConfig,
+    url: &str,
+    max_bytes: u64,
+    approval: NetworkApproval,
+) -> Result<Vec<u8>, ToolSystemError> {
+    require_not_forbidden(config, ToolId::FetchDocs)?;
+    let body = http_get_capped(url, max_bytes).await?;
+    let line = audit::format_fetch_audit(url, body.len());
+    let _ = audit::append_audit_line(line.trim_end());
+    let _ = approval;
+    Ok(body)
+}
+
+fn format_ddg_result_lines(html: &str, max_results: usize) -> String {
+    let mut out = String::new();
+    let mut count = 0usize;
+    for part in html.split("result__a") {
+        if count >= max_results {
+            break;
+        }
+        let Some(idx) = part.find("href=\"") else {
+            continue;
+        };
+        let href_part = &part[idx + 6..];
+        let Some(end) = href_part.find('"') else {
+            continue;
+        };
+        let link = &href_part[..end];
+        if link.starts_with("http") {
+            count += 1;
+            out.push_str(&format!("{count}. {link}\n"));
+        }
+    }
+    if out.is_empty() {
+        "No parseable search results (page layout may have changed). Try `cantrik fetch <url> --approve` for a known documentation URL.\n".to_string()
+    } else {
+        out
+    }
+}
+
+/// HTML search via Duck Duck Go (unofficial HTML endpoint; best-effort MVP).
+pub async fn tool_web_search(
+    config: &AppConfig,
+    query: &str,
+    max_results: usize,
+    max_response_bytes: u64,
+    approval: NetworkApproval,
+) -> Result<String, ToolSystemError> {
+    require_not_forbidden(config, ToolId::WebSearch)?;
+    let _ = approval;
+    let mut u = Url::parse("https://html.duckduckgo.com/html/")
+        .map_err(|e| ToolSystemError::Http(e.to_string()))?;
+    u.query_pairs_mut().append_pair("q", query);
+    let body = http_get_capped(u.as_str(), max_response_bytes).await?;
+    let html = String::from_utf8_lossy(&body);
+    Ok(format_ddg_result_lines(&html, max_results.max(1)))
 }
 
 #[cfg(test)]
@@ -248,6 +334,15 @@ mod tests {
     use super::*;
     use crate::config::AppConfig;
     use crate::tool_system::{ExecApproval, ToolId};
+
+    #[test]
+    fn ddg_format_extracts_links() {
+        let html =
+            r#"x result__a" href="http://example.com/a" y result__a" href="https://b.test/z""#;
+        let s = super::format_ddg_result_lines(html, 5);
+        assert!(s.contains("example.com"));
+        assert!(s.contains("b.test"));
+    }
 
     #[test]
     fn run_command_blocked_when_forbidden() {

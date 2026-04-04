@@ -9,8 +9,9 @@ mod tier;
 
 pub use approvals::{ExecApproval, NetworkApproval};
 pub use dispatch::{
-    DEFAULT_MAX_FETCH_BYTES, DEFAULT_MAX_TOOL_OUTPUT_BYTES, ToolSystemError, tool_git,
-    tool_read_file, tool_run_command, tool_search_rg, tool_web_fetch, tool_write_file,
+    DEFAULT_MAX_FETCH_BYTES, DEFAULT_MAX_TOOL_OUTPUT_BYTES, ToolSystemError, tool_browse_page,
+    tool_fetch_docs, tool_git, tool_read_file, tool_run_command, tool_search_rg, tool_web_fetch,
+    tool_web_search, tool_write_file,
 };
 pub use dispatch::{resolve_path_in_project, resolve_write_target};
 pub use forbidden::check_exec_argv;

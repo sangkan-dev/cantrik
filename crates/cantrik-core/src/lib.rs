@@ -2,6 +2,7 @@ pub mod audit;
 pub mod background;
 pub mod checkpoint;
 pub mod config;
+pub mod git_workflow;
 pub mod indexing;
 pub mod llm;
 pub mod multi_agent;

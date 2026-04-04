@@ -32,6 +32,20 @@ pub struct AppConfig {
     /// Semantic diff, handoff, export/import, replay (Sprint 15).
     #[serde(default)]
     pub collab: CollabConfig,
+    /// Git branch/PR workflow and web research caps (Sprint 16).
+    #[serde(default)]
+    pub git_workflow: GitWorkflowConfig,
+}
+
+/// Git-native workflow + web tool limits (Sprint 16, PRD §4.11, §4.13).
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct GitWorkflowConfig {
+    /// Prefix for `workspace branch start` (default `feature/cantrik-`).
+    pub branch_prefix: Option<String>,
+    /// `auto` | `gh` | `none` — PR creation backend (default `auto`).
+    pub pr_provider: Option<String>,
+    pub web_search_max_results: Option<u32>,
+    pub web_fetch_max_bytes: Option<u64>,
 }
 
 /// Collaboration / semantic diff limits (Sprint 15, PRD §4.8, §4.23, §4.27).
@@ -310,6 +324,26 @@ impl AppConfig {
                     .replay_tail_messages
                     .or(self.collab.replay_tail_messages),
             },
+            git_workflow: GitWorkflowConfig {
+                branch_prefix: override_config
+                    .git_workflow
+                    .branch_prefix
+                    .clone()
+                    .or_else(|| self.git_workflow.branch_prefix.clone()),
+                pr_provider: override_config
+                    .git_workflow
+                    .pr_provider
+                    .clone()
+                    .or_else(|| self.git_workflow.pr_provider.clone()),
+                web_search_max_results: override_config
+                    .git_workflow
+                    .web_search_max_results
+                    .or(self.git_workflow.web_search_max_results),
+                web_fetch_max_bytes: override_config
+                    .git_workflow
+                    .web_fetch_max_bytes
+                    .or(self.git_workflow.web_fetch_max_bytes),
+            },
         }
     }
 }
@@ -371,6 +405,30 @@ pub fn effective_collab_max_files_in_report(c: &CollabConfig) -> usize {
 
 pub fn effective_collab_replay_tail_messages(c: &CollabConfig) -> i64 {
     i64::from(c.replay_tail_messages.unwrap_or(50).max(1))
+}
+
+pub fn effective_git_branch_prefix(c: &GitWorkflowConfig) -> String {
+    c.branch_prefix
+        .clone()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "feature/cantrik-".to_string())
+}
+
+/// Returns `gh`, `none`, or `auto` (try `gh` when origin looks like GitHub).
+pub fn effective_pr_provider(c: &GitWorkflowConfig) -> String {
+    c.pr_provider
+        .clone()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "auto".to_string())
+        .to_ascii_lowercase()
+}
+
+pub fn effective_web_search_max_results(c: &GitWorkflowConfig) -> usize {
+    c.web_search_max_results.unwrap_or(5).max(1) as usize
+}
+
+pub fn effective_web_fetch_max_bytes(c: &GitWorkflowConfig, fallback: u64) -> u64 {
+    c.web_fetch_max_bytes.unwrap_or(fallback).max(1024)
 }
 
 /// Whether to append provenance JSONL on successful writes.

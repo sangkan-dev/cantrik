@@ -5,6 +5,10 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+pub use crate::commands::pr_cmd::PrCommand;
+pub use crate::commands::web_cmd::WebCommand;
+pub use crate::commands::workspace_cmd::WorkspaceCommand;
+
 /// Global options available on every subcommand.
 #[derive(Debug, Parser)]
 pub struct GlobalOpts {
@@ -221,6 +225,34 @@ pub enum Command {
     Replay {
         #[command(subcommand)]
         sub: ReplayCommand,
+    },
+    /// Feature branch and AI-assisted commit (Sprint 16). Does not replace read-only `cantrik git`.
+    Workspace {
+        #[command(subcommand)]
+        sub: WorkspaceCommand,
+    },
+    /// Open a GitHub pull request via `gh pr create` (Sprint 16).
+    Pr {
+        #[command(subcommand)]
+        sub: PrCommand,
+    },
+    /// LLM review of staged diff (default) or full worktree vs HEAD (`--worktree`).
+    Review {
+        #[arg(long)]
+        worktree: bool,
+        /// On LLM failure exit 0 (for optional git hooks).
+        #[arg(long)]
+        soft: bool,
+    },
+    /// Issue URL: prints suggested workflow; full auto-fix deferred (Sprint 16).
+    Fix {
+        #[arg(value_name = "ISSUE_URL")]
+        issue_url: String,
+    },
+    /// Web search / fetch with explicit `--approve` (Sprint 16, PRD §4.13).
+    Web {
+        #[command(subcommand)]
+        sub: WebCommand,
     },
     /// Check Cantrik installation, config, and connectivity (expanded over sprints).
     Doctor,

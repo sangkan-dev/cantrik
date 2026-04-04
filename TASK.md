@@ -295,12 +295,14 @@ default_model = "llama-3.3-70b-versatile"
  
 **Goal:** Deep Git-Native Workflow + `cantrik review` + Web Research PRD (§4.11, §4.13, §4.22).
  
-- [ ] Auto-branch per task: `feature/cantrik-<task-slug>`
-- [ ] AI-generated commit message (semantic style) + approval sebelum commit
-- [ ] `cantrik pr create` — integrasi GitHub atau GitLab (minimal satu penyedia via `gh` CLI atau MCP)
-- [ ] `cantrik fix <issue-url>` — SWE-agent mode: analisis issue, fix, test, buat PR (stretch — boleh defer sebagian)
-- [ ] `cantrik review` — pre-commit AI review; bisa jadi git pre-commit hook
-- [ ] Web research: `web_search`, `browse_page`, `fetch_docs` dengan approval eksplisit (§4.13 PRD)
+- [x] Auto-branch per task: `cantrik workspace branch start <slug>` → `feature/cantrik-<slug>` (prefix dari `[git_workflow].branch_prefix`)
+- [x] AI-generated commit message + approval: `cantrik workspace commit` (LLM dari `git diff --cached`); `git commit` hanya dengan `--approve`
+- [x] `cantrik pr create` — GitHub via `gh pr create` (origin harus GitHub); `[git_workflow].pr_provider = "none"` mematikan
+- [x] `cantrik fix <url>` — stub MVP + langkah manual (`fetch` / `agents` / `workspace commit` / `pr create`); loop SWE penuh ditunda
+- [x] `cantrik review` — LLM pada diff ter-staging (default) atau `--worktree`; `--soft` untuk hook; contoh hook: [contrib/git-hooks/pre-commit-review.sample](contrib/git-hooks/pre-commit-review.sample)
+- [x] Web research: tool `web_search` / `browse_page` / `fetch_docs` (guardrails); CLI `cantrik web search|fetch` dengan `--approve` (§4.13)
+ 
+**Batas MVP:** Tanpa browser/JS sandbox penuh; pencarian via DuckDuckGo HTML (parsing rapuh); tanpa GitLab/Bitbucket native; `cantrik fix` tanpa otomasi test+PR. Konfigurasi opsional `[git_workflow]` di `cantrik.toml`.
  
 **Definition of Done:** Alur lokal dari auto-branch hingga PR dapat diotomatisasi pada repo demo; review command bisa run standalone; web fetch hanya setelah approve.
  

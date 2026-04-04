@@ -12,8 +12,8 @@ use cantrik_core::config::{load_merged_config, resolve_config_paths};
 use clap::Parser;
 
 pub use cli::{
-    Cli, Command, CompletionShell, FileCommand, MacroCommand, McpCommand, ReplayCommand,
-    SessionCommand, SkillCommand,
+    Cli, Command, CompletionShell, FileCommand, MacroCommand, McpCommand, PrCommand, ReplayCommand,
+    SessionCommand, SkillCommand, WebCommand, WorkspaceCommand,
 };
 
 const STDIN_MAX_BYTES: u64 = 4 * 1024 * 1024;
@@ -124,6 +124,13 @@ pub async fn run() -> ExitCode {
             }
             ReplayCommand::Play { file } => commands::collab_cmd::replay_play(file),
         },
+        Some(Command::Workspace { sub }) => commands::workspace_cmd::run(&cwd, sub).await,
+        Some(Command::Pr { sub }) => commands::pr_cmd::run_standalone(&cwd, sub),
+        Some(Command::Review { worktree, soft }) => {
+            commands::review_cmd::run(&cwd, *worktree, *soft).await
+        }
+        Some(Command::Fix { issue_url }) => commands::fix_cmd::run(issue_url),
+        Some(Command::Web { sub }) => commands::web_cmd::run(&cwd, sub).await,
         Some(Command::Doctor) => commands::doctor::run(&cwd),
         Some(Command::Ask { query }) => {
             let config = match load_merged_config(&cwd) {
@@ -485,6 +492,56 @@ mod tests {
                 assert!(json.contains("cantrik"));
             }
             _ => panic!("expected mcp call"),
+        }
+    }
+
+    #[test]
+    fn parse_sprint16_git_web() {
+        use super::{PrCommand, WebCommand, WorkspaceCommand};
+        use crate::commands::workspace_cmd::WorkspaceBranchCommand;
+        let cli = Cli::try_parse_from(["cantrik", "workspace", "branch", "start", "my-task"])
+            .expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Workspace { sub } => match sub {
+                WorkspaceCommand::Branch { sub: b } => match b {
+                    WorkspaceBranchCommand::Start { slug, allow_dirty } => {
+                        assert_eq!(slug, "my-task");
+                        assert!(!allow_dirty);
+                    }
+                },
+                _ => panic!("expected branch"),
+            },
+            _ => panic!("expected workspace"),
+        }
+        let cli = Cli::try_parse_from(["cantrik", "pr", "create", "--approve"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Pr {
+                sub: PrCommand::Create { approve, .. },
+            } => assert!(approve),
+            _ => panic!("expected pr create"),
+        }
+        let cli =
+            Cli::try_parse_from(["cantrik", "review", "--worktree", "--soft"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Review { worktree, soft } => {
+                assert!(worktree);
+                assert!(soft);
+            }
+            _ => panic!("expected review"),
+        }
+        let cli = Cli::try_parse_from(["cantrik", "fix", "https://github.com/a/b/issues/1"])
+            .expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Fix { issue_url } => assert!(issue_url.contains("issues/1")),
+            _ => panic!("expected fix"),
+        }
+        let cli =
+            Cli::try_parse_from(["cantrik", "web", "search", "rust", "async"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Web {
+                sub: WebCommand::Search { query, .. },
+            } => assert_eq!(query, vec!["rust", "async"]),
+            _ => panic!("expected web search"),
         }
     }
 

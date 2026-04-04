@@ -8,9 +8,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use thiserror::Error;
 
+use crate::config::load_merged_config;
 use crate::session::{
-    self, append_message, latest_summary, list_messages_tail_for_replay, list_recent_decisions,
-    open_or_create_session,
+    append_message, latest_summary, list_messages_tail_for_replay, list_recent_decisions,
+    open_or_create_session, session_project_fingerprint,
 };
 use crate::skills::list_skill_paths;
 
@@ -87,7 +88,8 @@ pub async fn export_context_bundle(
     tail_limit: i64,
 ) -> Result<ContextBundleV1, CollabError> {
     let session_id = open_or_create_session(pool, project_root).await?;
-    let fp = session::project_fingerprint(project_root);
+    let app = load_merged_config(project_root).unwrap_or_default();
+    let fp = session_project_fingerprint(project_root, &app);
     let msgs = list_messages_tail_for_replay(pool, &session_id, tail_limit).await?;
     let cantrik_path = project_root.join(".cantrik").join("cantrik.toml");
     let cantrik_toml = if cantrik_path.is_file() {
@@ -172,7 +174,8 @@ pub async fn write_handoff_markdown(
     next_steps: Option<&str>,
 ) -> Result<PathBuf, CollabError> {
     let session_id = open_or_create_session(pool, project_root).await?;
-    let fp = session::project_fingerprint(project_root);
+    let app = load_merged_config(project_root).unwrap_or_default();
+    let fp = session_project_fingerprint(project_root, &app);
     let cwd_display = project_root.display().to_string();
     let mut decisions = list_recent_decisions(pool, &session_id, 10).await?;
     decisions.reverse();
@@ -242,7 +245,8 @@ pub async fn export_session_replay_json(
     tail_limit: i64,
 ) -> Result<SessionReplayFileV1, CollabError> {
     let session_id = open_or_create_session(pool, project_root).await?;
-    let fp = session::project_fingerprint(project_root);
+    let app = load_merged_config(project_root).unwrap_or_default();
+    let fp = session_project_fingerprint(project_root, &app);
     let msgs = list_messages_tail_for_replay(pool, &session_id, tail_limit).await?;
     Ok(SessionReplayFileV1 {
         schema_version: SESSION_REPLAY_SCHEMA_VERSION,

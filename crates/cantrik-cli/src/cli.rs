@@ -296,6 +296,8 @@ pub enum Command {
         #[arg(short, long, value_name = "PATH")]
         output: Option<PathBuf>,
     },
+    /// Language Server (stdio): `textDocument/documentSymbol` from `.cantrik/index/ast/chunks.jsonl` (PRD §4.16).
+    Lsp,
     /// Transcribe audio via Ollama when `[ui].voice_enabled` (or use `--raw-text` for tests).
     Listen {
         /// Audio file to send to `{ollama}/api/transcribe`.

@@ -92,7 +92,7 @@ pub async fn maybe_summarize_session(
         block
     );
 
-    let fp = super::project_fingerprint(_cwd);
+    let fp = super::session_project_fingerprint(_cwd, app);
     let usage = llm::LlmUsageContext {
         pool,
         session_id: Some(session_id),

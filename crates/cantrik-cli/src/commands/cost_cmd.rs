@@ -3,7 +3,8 @@
 use std::path::Path;
 use std::process::ExitCode;
 
-use cantrik_core::session::{connect_pool, open_or_create_session, project_fingerprint};
+use cantrik_core::config::load_merged_config;
+use cantrik_core::session::{connect_pool, open_or_create_session, session_project_fingerprint};
 use cantrik_core::usage_ledger::{current_year_month_utc, month_spend_usd, session_spend_usd};
 
 pub async fn run(cwd: &Path, session_only: bool) -> ExitCode {
@@ -14,7 +15,8 @@ pub async fn run(cwd: &Path, session_only: bool) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let fp = project_fingerprint(cwd);
+    let app = load_merged_config(cwd).unwrap_or_default();
+    let fp = session_project_fingerprint(cwd, &app);
     let ym = current_year_month_utc();
 
     let month = match month_spend_usd(&pool, &fp, &ym).await {

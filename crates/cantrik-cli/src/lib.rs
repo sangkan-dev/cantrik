@@ -61,6 +61,13 @@ pub async fn run() -> ExitCode {
     }
 
     match &cli.cmd {
+        Some(Command::Lsp) => match commands::lsp_cmd::run().await {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("cantrik lsp: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Some(Command::Cost { session_only }) => commands::cost_cmd::run(&cwd, *session_only).await,
         Some(Command::Serve { mcp }) => {
             if !*mcp {
@@ -603,6 +610,12 @@ mod tests {
         ));
         let cli = Cli::try_parse_from(["cantrik", "serve", "--mcp"]).expect("parse");
         assert!(matches!(cli.cmd, Some(Command::Serve { mcp: true })));
+    }
+
+    #[test]
+    fn parse_lsp_subcommand() {
+        let cli = Cli::try_parse_from(["cantrik", "lsp"]).expect("parse");
+        assert!(matches!(cli.cmd, Some(Command::Lsp)));
     }
 
     #[test]

@@ -16,6 +16,7 @@ pub(crate) mod git_cmd;
 pub(crate) mod index;
 pub(crate) mod intelligence_cmd;
 pub(crate) mod listen_cmd;
+pub(crate) mod lsp_cmd;
 pub(crate) mod macro_cmd;
 pub(crate) mod mcp_client_cmd;
 pub(crate) mod plan;

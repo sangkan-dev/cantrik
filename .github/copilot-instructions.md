@@ -29,3 +29,8 @@
 - Jelaskan trade-off teknis secara ringkas dan berbasis dampak.
 - Jika blocked oleh asumsi/keputusan produk, minta konfirmasi dengan pertanyaan spesifik.
 - Gunakan Bahasa Indonesia untuk penjelasan ke user kecuali diminta lain.
+
+## Editor LSP (`cantrik lsp`, Sprint 18)
+- Jalankan `cantrik lsp` di **akar proyek** (stdio). Klien mengirim `rootUri` / folder workspace pertama; Cantrik membaca simbol dari `{root}/.cantrik/index/ast/chunks.jsonl` setelah `cantrik index`.
+- **Neovim** (contoh): `vim.lsp.start({ name = 'cantrik', cmd = { 'cantrik', 'lsp' }, root_dir = root })` dengan `root` = direktori berisi `.cantrik/`.
+- **VS Code**: tambahkan server kustom stdio, command `cantrik`, args `lsp`, cwd = root repo.

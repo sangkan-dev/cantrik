@@ -12,7 +12,7 @@ pub use paths::{
     ENV_MEMORY_DB, global_anchors_path, memory_db_path, project_anchors_path, share_dir,
 };
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 use sqlx::Row;
@@ -40,8 +40,33 @@ pub fn project_fingerprint(cwd: &Path) -> String {
     hex::encode(Sha256::digest(s.as_bytes()))
 }
 
+/// Fingerprint for a logical workspace: primary cwd plus optional extra canonical roots, sorted and hashed.
+/// When `extra` is empty, matches [`project_fingerprint`].
+pub fn project_fingerprint_with_workspace(cwd: &Path, extra: &[PathBuf]) -> String {
+    if extra.is_empty() {
+        return project_fingerprint(cwd);
+    }
+    let primary = std::fs::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    let mut roots: Vec<String> = Vec::new();
+    roots.push(primary.to_string_lossy().into_owned());
+    for p in extra {
+        roots.push(p.to_string_lossy().into_owned());
+    }
+    roots.sort();
+    roots.dedup();
+    let payload = roots.join("\n");
+    hex::encode(Sha256::digest(payload.as_bytes()))
+}
+
+/// Session / usage grouping fingerprint: respects `[workspace].extra_roots` when set.
+pub fn session_project_fingerprint(cwd: &Path, app: &crate::config::AppConfig) -> String {
+    let extra = crate::config::effective_workspace_extra_roots(cwd, app);
+    project_fingerprint_with_workspace(cwd, &extra)
+}
+
 pub async fn open_or_create_session(pool: &SqlitePool, cwd: &Path) -> Result<String, SessionError> {
-    let fp = project_fingerprint(cwd);
+    let app = crate::config::load_merged_config(cwd).unwrap_or_default();
+    let fp = session_project_fingerprint(cwd, &app);
     let row = sqlx::query(
         "SELECT id FROM sessions WHERE project_fingerprint = ? ORDER BY updated_at DESC LIMIT 1",
     )
@@ -299,7 +324,8 @@ pub async fn list_sessions_for_project(
     pool: &SqlitePool,
     cwd: &Path,
 ) -> Result<Vec<SessionListEntry>, SessionError> {
-    let fp = project_fingerprint(cwd);
+    let app = crate::config::load_merged_config(cwd).unwrap_or_default();
+    let fp = session_project_fingerprint(cwd, &app);
     let rows = sqlx::query(
         r#"SELECT s.id, s.updated_at,
            (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.id) AS mc
@@ -346,4 +372,39 @@ pub async fn adaptive_stub_set(
     .execute(pool)
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod fingerprint_tests {
+    use std::fs;
+
+    use tempfile::tempdir;
+
+    use super::{project_fingerprint, project_fingerprint_with_workspace};
+
+    #[test]
+    fn project_fingerprint_with_workspace_empty_extra_matches_primary() {
+        let dir = tempdir().expect("tmp");
+        let a = dir.path().join("a");
+        fs::create_dir_all(&a).expect("mkdir");
+        assert_eq!(
+            project_fingerprint(&a),
+            project_fingerprint_with_workspace(&a, &[])
+        );
+    }
+
+    #[test]
+    fn project_fingerprint_with_workspace_includes_extra_root() {
+        let dir = tempdir().expect("tmp");
+        let a = dir.path().join("a");
+        let b = dir.path().join("b");
+        fs::create_dir_all(&a).expect("mkdir a");
+        fs::create_dir_all(&b).expect("mkdir b");
+        let bc = fs::canonicalize(&b).expect("canon b");
+        let solo = project_fingerprint(&a);
+        let merged = project_fingerprint_with_workspace(&a, &[bc.clone()]);
+        assert_ne!(solo, merged);
+        let merged2 = project_fingerprint_with_workspace(&a, &[bc]);
+        assert_eq!(merged, merged2);
+    }
 }

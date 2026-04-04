@@ -11,7 +11,7 @@ use cantrik_core::cultural_wisdom;
 use cantrik_core::llm::{self, LlmError};
 use cantrik_core::session::{
     append_message, build_llm_prompt, connect_pool, load_anchors_combined, maybe_summarize_session,
-    memory_db_path, message_count, open_or_create_session, project_fingerprint,
+    memory_db_path, message_count, open_or_create_session, session_project_fingerprint,
 };
 use cantrik_core::usage_ledger::{current_year_month_utc, month_spend_usd, session_spend_usd};
 use cantrik_core::visualize::{self, VisualizeKind};
@@ -267,7 +267,7 @@ fn handle_line(
                 }
             }
             SlashCmd::Cost => {
-                let fp = project_fingerprint(cwd);
+                let fp = session_project_fingerprint(cwd, config);
                 let ym = current_year_month_utc();
                 let fut = async {
                     let pool = if let Some(m) = &state.mem {
@@ -443,7 +443,7 @@ fn handle_line(
     let tx_done = tx_llm.clone();
     let acc = Arc::new(Mutex::new(String::new()));
     let acc2 = acc.clone();
-    let fp = project_fingerprint(cwd);
+    let fp = session_project_fingerprint(cwd, &cfg);
     rt.spawn(async move {
         let r = if let Some((ref pool, ref session_id)) = mem {
             let usage = llm::LlmUsageContext {

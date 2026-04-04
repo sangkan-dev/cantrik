@@ -2,6 +2,7 @@
 
 mod chunk;
 mod graph;
+mod lsp_symbols;
 mod manifest;
 mod scan;
 mod writer;
@@ -11,6 +12,9 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+pub use lsp_symbols::{
+    IndexedSymbolOutline, load_chunks_for_document, outlines_from_chunks, parse_chunks_jsonl,
+};
 pub use manifest::Manifest;
 pub use writer::{chunks_path, graph_path, read_all_source_chunks};
 

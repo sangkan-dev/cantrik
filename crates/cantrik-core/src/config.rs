@@ -38,6 +38,17 @@ pub struct AppConfig {
     /// Explain, teach, dependency intel (Sprint 17, PRD §4.20, §4.24–4.25).
     #[serde(default)]
     pub intelligence: IntelligenceConfig,
+    /// Optional extra workspace roots for session fingerprint (Sprint 18 follow-up, monorepo).
+    #[serde(default)]
+    pub workspace: WorkspaceConfig,
+}
+
+/// Extra directories merged into the session project fingerprint when non-empty (Sprint 18 follow-up).
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct WorkspaceConfig {
+    /// Paths relative to the primary project directory or absolute; invalid entries are skipped with a warning.
+    #[serde(default)]
+    pub extra_roots: Vec<String>,
 }
 
 /// Intelligence tools limits and audit command override (Sprint 17).
@@ -403,6 +414,12 @@ impl AppConfig {
                     .clone()
                     .or_else(|| self.intelligence.audit_command.clone()),
             },
+            workspace: WorkspaceConfig {
+                extra_roots: merge_str_lists(
+                    &self.workspace.extra_roots,
+                    &override_config.workspace.extra_roots,
+                ),
+            },
         }
     }
 }
@@ -522,6 +539,31 @@ pub fn effective_audit_command(c: &IntelligenceConfig) -> Vec<String> {
         .clone()
         .filter(|v| !v.is_empty())
         .unwrap_or_else(|| vec!["cargo".into(), "audit".into()])
+}
+
+/// Canonical, sorted, deduplicated extra roots from config (excludes the primary cwd).
+pub fn effective_workspace_extra_roots(primary: &Path, app: &AppConfig) -> Vec<PathBuf> {
+    use std::collections::HashSet;
+
+    let mut seen: HashSet<PathBuf> = HashSet::new();
+    let mut out: Vec<PathBuf> = Vec::new();
+    for raw in &app.workspace.extra_roots {
+        let p = PathBuf::from(raw);
+        let joined = if p.is_absolute() { p } else { primary.join(p) };
+        match fs::canonicalize(&joined) {
+            Ok(c) => {
+                if seen.insert(c.clone()) {
+                    out.push(c);
+                }
+            }
+            Err(e) => {
+                eprintln!("cantrik: [workspace].extra_roots: skip {joined:?}: {e}");
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
 }
 
 /// Whether to append provenance JSONL on successful writes.
@@ -733,5 +775,25 @@ mod tests {
         assert!(effective_voice_enabled(&m.ui));
         assert!(effective_tui_split_pane(&m.ui));
         assert_eq!(effective_transcription_model(&m.ui), "large-v3");
+    }
+
+    #[test]
+    fn workspace_extra_roots_merge_global_and_project() {
+        let base = AppConfig {
+            workspace: WorkspaceConfig {
+                extra_roots: vec!["../lib-a".into()],
+            },
+            ..Default::default()
+        };
+        let over = AppConfig {
+            workspace: WorkspaceConfig {
+                extra_roots: vec!["../lib-b".into()],
+            },
+            ..Default::default()
+        };
+        let m = base.merge(over);
+        assert_eq!(m.workspace.extra_roots.len(), 2);
+        assert!(m.workspace.extra_roots.contains(&"../lib-a".into()));
+        assert!(m.workspace.extra_roots.contains(&"../lib-b".into()));
     }
 }

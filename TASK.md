@@ -331,12 +331,12 @@ default_model = "llama-3.3-70b-versatile"
 - [x] Voice-to-Code: `cantrik listen` — opt-in `[ui] voice_enabled`; audio → Ollama `/api/transcribe` bila tersedia; `--raw-text` untuk uji tanpa audio (§4.26 PRD)
 - [x] TTS notifikasi untuk background task — opt-in (`voice_enabled` + `espeak` / `say` pada Linux/macOS)
 - [x] `/visualize` + `cantrik visualize` → Mermaid (callgraph dari indeks, architecture dari tree dir, dependencies dari `cargo tree`); export `--output` (§4.17 PRD)
-- [ ] LSP server mode (`cantrik lsp`) — **ditunda fase 2** (subset PRD §4.16; prioritas sprint: visual + UX config)
+- [x] LSP server mode (`cantrik lsp`) — stdio MVP: `documentSymbol` + hover dari `.cantrik/index/ast/chunks.jsonl` (subset PRD §4.16)
 - [x] TUI split pane — `[ui] tui_split_pane`: assistant + panel preview (`/visualize`); panel “semantic diff / approval” penuh ditunda (§6 Enhancement PRD)
 - [x] Cultural Wisdom Mode: `[ui] cultural_wisdom = "off" | "light" | "full"` — injeksi ke `build_llm_prompt` + REPL tanpa sesi (§6 Enhancement PRD)
-- [ ] Multi-root workspace — **ditunda** (fase 2; risiko fingerprint/sesi)
+- [x] Multi-root workspace (MVP) — `[workspace].extra_roots` menggabungkan fingerprint **sesi** (`session_project_fingerprint`); indeks multi-root otomatis belum
  
-**Batas MVP (Sprint 18):** Tanpa PlantUML generator; tanpa LSP; callgraph hanya intra-file dari `graph.json`; STT bergantung build Ollama yang mendukung `/api/transcribe` + model whisper. Konfigurasi `[ui]`: `cultural_wisdom`, `voice_enabled`, `tui_split_pane`, `transcription_model`.
+**Batas MVP (Sprint 18):** Tanpa PlantUML generator; **LSP:** stdio saja, tanpa completion/rename/diagnostics bahasa asli; simbol hanya dari indeks AST (`chunks.jsonl`); satu root per proses LSP (folder `initialize` / workspace folder pertama). **Multi-root:** hanya identitas sesi + usage yang mengikuti fingerprint gabungan; `cantrik index` / background jobs tetap per cwd utama. Callgraph hanya intra-file dari `graph.json`; STT bergantung build Ollama yang mendukung `/api/transcribe` + model whisper. Konfigurasi `[ui]`: `cultural_wisdom`, `voice_enabled`, `tui_split_pane`, `transcription_model`. Konfigurasi `[workspace]`: `extra_roots`.
  
 **Definition of Done:** Minimal satu alur voice atau visual atau LSP teruji end-to-end; cultural wisdom mode bisa dikonfigurasi.
  

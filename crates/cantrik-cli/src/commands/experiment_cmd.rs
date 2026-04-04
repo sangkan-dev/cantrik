@@ -1,3 +1,6 @@
+//! Experiment mode: LLM JSON writes → test command → **revert checkpoints** on write/test failure.
+//! PRD §4.21 benchmark compare before/after writes is **not** implemented here (deferred; see TASK.md Sprint 17).
+
 use std::io::Write;
 use std::path::Path;
 use std::process::ExitCode;

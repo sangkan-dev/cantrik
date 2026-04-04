@@ -3,7 +3,7 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 pub use crate::commands::pr_cmd::PrCommand;
 pub use crate::commands::web_cmd::WebCommand;
@@ -244,6 +244,40 @@ pub enum Command {
         #[arg(long)]
         soft: bool,
     },
+    /// Git blame + log for a file; optional LLM narrative (`--why`, Sprint 17).
+    Explain {
+        /// Source file (required; repository path).
+        #[arg(value_name = "FILE")]
+        path: PathBuf,
+        /// Ask the configured LLM to synthesize evolution / intent from blame + log.
+        #[arg(long)]
+        why: bool,
+        /// Focus `git blame` window starting at this 1-based line.
+        #[arg(long, value_name = "N")]
+        line: Option<u32>,
+    },
+    /// Draft architecture / ADR stubs from repo context (Sprint 17); LLM required.
+    Teach {
+        /// Write `ARCHITECTURE.md` here instead of printing to stdout.
+        #[arg(long, value_name = "DIR")]
+        output_dir: Option<PathBuf>,
+        /// `markdown` (default) or `wiki` (Obsidian-style frontmatter + `[[wikilinks]]`).
+        #[arg(long, value_enum, default_value_t = TeachFormatArg::Markdown)]
+        format: TeachFormatArg,
+    },
+    /// Why a crate is in the tree (`cargo tree -i`, Sprint 17).
+    Why {
+        /// Dependency package name as in Cargo.toml.
+        #[arg(value_name = "CRATE")]
+        crate_name: String,
+        /// Optional LLM summary paragraph.
+        #[arg(long)]
+        synthesize: bool,
+    },
+    /// Suggested upgrade priorities from lockfile + shallow tree (LLM; no `cargo update`, Sprint 17).
+    Upgrade,
+    /// Run `cargo audit` or `[intelligence].audit_command` (Sprint 17).
+    Audit,
     /// Issue URL: prints suggested workflow; full auto-fix deferred (Sprint 16).
     Fix {
         #[arg(value_name = "ISSUE_URL")]
@@ -367,6 +401,14 @@ pub enum FileCommand {
         #[arg(long)]
         approve: bool,
     },
+}
+
+/// Output style for `cantrik teach` (Sprint 17).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
+pub enum TeachFormatArg {
+    #[default]
+    Markdown,
+    Wiki,
 }
 
 /// Shells supported by `clap_complete` for static completion scripts.

@@ -13,7 +13,7 @@ use clap::Parser;
 
 pub use cli::{
     Cli, Command, CompletionShell, FileCommand, MacroCommand, McpCommand, PrCommand, ReplayCommand,
-    SessionCommand, SkillCommand, WebCommand, WorkspaceCommand,
+    SessionCommand, SkillCommand, TeachFormatArg, WebCommand, WorkspaceCommand,
 };
 
 const STDIN_MAX_BYTES: u64 = 4 * 1024 * 1024;
@@ -128,6 +128,63 @@ pub async fn run() -> ExitCode {
         Some(Command::Pr { sub }) => commands::pr_cmd::run_standalone(&cwd, sub),
         Some(Command::Review { worktree, soft }) => {
             commands::review_cmd::run(&cwd, *worktree, *soft).await
+        }
+        Some(Command::Explain { path, why, line }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("failed to load config: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            commands::intelligence_cmd::run_explain(&config, &cwd, path, *line, *why).await
+        }
+        Some(Command::Teach { output_dir, format }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("failed to load config: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            let fmt = match format {
+                cli::TeachFormatArg::Wiki => commands::intelligence_cmd::TeachFormat::Wiki,
+                cli::TeachFormatArg::Markdown => commands::intelligence_cmd::TeachFormat::Markdown,
+            };
+            commands::intelligence_cmd::run_teach(&config, &cwd, output_dir.as_deref(), fmt).await
+        }
+        Some(Command::Why {
+            crate_name,
+            synthesize,
+        }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("failed to load config: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            commands::intelligence_cmd::run_why(&config, &cwd, crate_name, *synthesize).await
+        }
+        Some(Command::Upgrade) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("failed to load config: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            commands::intelligence_cmd::run_upgrade(&config, &cwd).await
+        }
+        Some(Command::Audit) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("failed to load config: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            commands::intelligence_cmd::run_audit(&config, &cwd)
         }
         Some(Command::Fix { issue_url }) => commands::fix_cmd::run(issue_url),
         Some(Command::Web { sub }) => commands::web_cmd::run(&cwd, sub).await,
@@ -410,12 +467,57 @@ mod tests {
 
     #[test]
     fn parse_external_routes_to_freeform() {
-        let cli = Cli::try_parse_from(["cantrik", "explain", "this", "repo"]).expect("parse");
+        // Must not use a real subcommand name (e.g. `explain` is Sprint 17).
+        let cli = Cli::try_parse_from(["cantrik", "not_a_subcommand", "this", "repo"]).expect("parse");
         match cli.cmd.unwrap() {
             Command::External(parts) => {
                 assert_eq!(parts.len(), 3);
             }
             _ => panic!("expected external"),
+        }
+    }
+
+    #[test]
+    fn parse_explain_file_line_why() {
+        let cli = Cli::try_parse_from([
+            "cantrik",
+            "explain",
+            "crates/foo/src/lib.rs",
+            "--why",
+            "--line",
+            "10",
+        ])
+        .expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Explain { path, why, line } => {
+                assert_eq!(path, std::path::PathBuf::from("crates/foo/src/lib.rs"));
+                assert!(why);
+                assert_eq!(line, Some(10));
+            }
+            _ => panic!("expected explain"),
+        }
+    }
+
+    #[test]
+    fn parse_teach_output_dir_format() {
+        let cli = Cli::try_parse_from([
+            "cantrik",
+            "teach",
+            "--output-dir",
+            ".cantrik/docs",
+            "--format",
+            "wiki",
+        ])
+        .expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Teach { output_dir, format } => {
+                assert_eq!(
+                    output_dir,
+                    Some(std::path::PathBuf::from(".cantrik/docs"))
+                );
+                assert_eq!(format, TeachFormatArg::Wiki);
+            }
+            _ => panic!("expected teach"),
         }
     }
 

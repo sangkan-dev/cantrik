@@ -4,6 +4,7 @@ pub mod checkpoint;
 pub mod config;
 pub mod git_workflow;
 pub mod indexing;
+pub mod intelligence;
 pub mod llm;
 pub mod multi_agent;
 pub mod planning;

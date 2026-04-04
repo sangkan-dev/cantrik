@@ -35,6 +35,21 @@ pub struct AppConfig {
     /// Git branch/PR workflow and web research caps (Sprint 16).
     #[serde(default)]
     pub git_workflow: GitWorkflowConfig,
+    /// Explain, teach, dependency intel (Sprint 17, PRD §4.20, §4.24–4.25).
+    #[serde(default)]
+    pub intelligence: IntelligenceConfig,
+}
+
+/// Intelligence tools limits and audit command override (Sprint 17).
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct IntelligenceConfig {
+    /// Max lines included from `git blame` output (default 200).
+    pub explain_max_blame_lines: Option<u32>,
+    /// Max files scanned for `teach` context (default 64).
+    pub teach_max_files_scanned: Option<u32>,
+    /// Override audit argv (default: `cargo audit`).
+    #[serde(default)]
+    pub audit_command: Option<Vec<String>>,
 }
 
 /// Git-native workflow + web tool limits (Sprint 16, PRD §4.11, §4.13).
@@ -344,6 +359,21 @@ impl AppConfig {
                     .web_fetch_max_bytes
                     .or(self.git_workflow.web_fetch_max_bytes),
             },
+            intelligence: IntelligenceConfig {
+                explain_max_blame_lines: override_config
+                    .intelligence
+                    .explain_max_blame_lines
+                    .or(self.intelligence.explain_max_blame_lines),
+                teach_max_files_scanned: override_config
+                    .intelligence
+                    .teach_max_files_scanned
+                    .or(self.intelligence.teach_max_files_scanned),
+                audit_command: override_config
+                    .intelligence
+                    .audit_command
+                    .clone()
+                    .or_else(|| self.intelligence.audit_command.clone()),
+            },
         }
     }
 }
@@ -429,6 +459,21 @@ pub fn effective_web_search_max_results(c: &GitWorkflowConfig) -> usize {
 
 pub fn effective_web_fetch_max_bytes(c: &GitWorkflowConfig, fallback: u64) -> u64 {
     c.web_fetch_max_bytes.unwrap_or(fallback).max(1024)
+}
+
+pub fn effective_explain_max_blame_lines(c: &IntelligenceConfig) -> usize {
+    c.explain_max_blame_lines.unwrap_or(200).max(1) as usize
+}
+
+pub fn effective_teach_max_files_scanned(c: &IntelligenceConfig) -> usize {
+    c.teach_max_files_scanned.unwrap_or(64).max(8) as usize
+}
+
+pub fn effective_audit_command(c: &IntelligenceConfig) -> Vec<String> {
+    c.audit_command
+        .clone()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| vec!["cargo".into(), "audit".into()])
 }
 
 /// Whether to append provenance JSONL on successful writes.
@@ -596,5 +641,29 @@ mod tests {
 
         assert!(config.guardrails.forbidden.contains(&"write_file".into()));
         assert!(config.guardrails.forbidden.contains(&"run_command".into()));
+    }
+
+    #[test]
+    fn intelligence_section_merge_and_effective_helpers() {
+        let base = AppConfig::default();
+        let override_config = AppConfig {
+            intelligence: IntelligenceConfig {
+                explain_max_blame_lines: Some(50),
+                teach_max_files_scanned: Some(16),
+                audit_command: Some(vec!["custom-audit".into(), "--json".into()]),
+            },
+            ..Default::default()
+        };
+        let merged = base.merge(override_config);
+        assert_eq!(merged.intelligence.explain_max_blame_lines, Some(50));
+        assert_eq!(effective_explain_max_blame_lines(&merged.intelligence), 50);
+        assert_eq!(effective_teach_max_files_scanned(&merged.intelligence), 16);
+        assert_eq!(
+            effective_audit_command(&merged.intelligence),
+            vec!["custom-audit", "--json"]
+        );
+        let def = IntelligenceConfig::default();
+        assert_eq!(effective_explain_max_blame_lines(&def), 200);
+        assert_eq!(effective_audit_command(&def), vec!["cargo", "audit"]);
     }
 }

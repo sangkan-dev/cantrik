@@ -312,11 +312,13 @@ default_model = "llama-3.3-70b-versatile"
  
 **Goal:** Code archaeology, knowledge extraction, dependency intel, experiment mode PRD (§4.20–4.25).
  
-- [ ] `cantrik explain [file] --why` — Code Archaeology via git blame + commit history (§4.20 PRD)
-- [ ] `cantrik teach` — generate ARCHITECTURE.md, ADR, API docs dari codebase (§4.25 PRD)
-- [ ] `cantrik teach --format wiki` — export ke format Obsidian/Notion/Confluence-compatible
-- [ ] `cantrik why <dep>`, `cantrik upgrade`, `cantrik audit` — Dependency Intelligence (§4.24 PRD)
-- [ ] Experiment Mode full implementation: run benchmark, compare, auto-revert (§4.21 PRD)
+- [x] `cantrik explain [file] --why` — Code Archaeology via git blame + commit history (§4.20 PRD)
+- [x] `cantrik teach` — generate ARCHITECTURE.md, ADR, API docs dari codebase (§4.25 PRD)
+- [x] `cantrik teach --format wiki` — export ke format Obsidian/Notion/Confluence-compatible
+- [x] `cantrik why <dep>`, `cantrik upgrade`, `cantrik audit` — Dependency Intelligence (§4.24 PRD)
+- [x] Experiment mode: revert otomatis jika tes/write gagal (sudah ada; §4.21 PRD) — bandingkan benchmark sebelum/sesudah **ditunda** (fase 2)
+ 
+**Batas MVP (Sprint 17):** Tanpa PR otomatis untuk explain; tanpa `cargo update` otomatis di `upgrade` (hanya saran LLM + konteks lock/tree); jika `cargo-audit` tidak terpasang, pesan jelas + `[intelligence].audit_command` opsional. Konfigurasi opsional `[intelligence]`: `explain_max_blame_lines`, `teach_max_files_scanned`, `audit_command`.
  
 **Definition of Done:** Minimal `cantrik explain` dan `cantrik audit` berjalan end-to-end; experiment mode bisa revert otomatis berdasarkan hasil test.
  

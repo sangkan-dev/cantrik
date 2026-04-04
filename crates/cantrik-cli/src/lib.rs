@@ -71,7 +71,7 @@ pub async fn run() -> ExitCode {
             let prompt = words_to_line(query);
             return commands::ask::run(&config, &cwd, &prompt).await;
         }
-        Some(Command::Plan { task }) => {
+        Some(Command::Plan { status, run, task }) => {
             let config = match load_merged_config(&cwd) {
                 Ok(config) => config,
                 Err(error) => {
@@ -80,7 +80,18 @@ pub async fn run() -> ExitCode {
                 }
             };
             let task_line = words_to_line(task);
-            return commands::plan::run(&config, &cwd, &task_line).await;
+            return commands::plan::run(&config, &cwd, &task_line, *run, *status).await;
+        }
+        Some(Command::Experiment { approve, goal }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(config) => config,
+                Err(error) => {
+                    eprintln!("failed to load config: {error}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            let g = words_to_line(goal);
+            return commands::experiment_cmd::run(&config, &cwd, &g, *approve).await;
         }
         Some(Command::Session { sub }) => match sub {
             SessionCommand::List => commands::session_cmd::list_cmd(&cwd).await,

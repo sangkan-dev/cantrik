@@ -2,6 +2,7 @@ pub(crate) mod ask;
 pub(crate) mod completions;
 pub(crate) mod doctor;
 pub(crate) mod exec_cmd;
+pub(crate) mod experiment_cmd;
 pub(crate) mod fetch_cmd;
 pub(crate) mod file_cmd;
 pub(crate) mod git_cmd;

@@ -1,40 +1,146 @@
-use std::io::{self, Write};
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use cantrik_core::config::AppConfig;
-use cantrik_core::llm::LlmError;
+use cantrik_core::config::{AppConfig, effective_max_replan_cycles, effective_stuck_threshold};
+use cantrik_core::planning::{
+    Plan, PlanLoopError, PlanOutcome, PlanningLimits, parse_plan_document, run_plan_loop,
+};
+use serde::{Deserialize, Serialize};
 
 use super::session_llm;
 
-pub(crate) async fn run(config: &AppConfig, cwd: &Path, task: &str) -> ExitCode {
+const PLAN_STATE_FILE: &str = "plan-state.json";
+
+#[derive(Serialize, Deserialize)]
+struct PlanStateFile {
+    schema_version: u32,
+    goal: String,
+    plan: Plan,
+}
+
+fn plan_state_path(cwd: &Path) -> PathBuf {
+    cwd.join(".cantrik").join(PLAN_STATE_FILE)
+}
+
+fn save_plan_state(cwd: &Path, goal: &str, plan: &Plan) -> Result<(), String> {
+    let dir = cwd.join(".cantrik");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let state = PlanStateFile {
+        schema_version: 1,
+        goal: goal.to_string(),
+        plan: plan.clone(),
+    };
+    let text = serde_json::to_string_pretty(&state).map_err(|e| e.to_string())?;
+    fs::write(plan_state_path(cwd), text).map_err(|e| e.to_string())
+}
+
+fn print_plan(goal: &str, plan: &Plan) {
+    println!("Goal: {goal}");
+    println!("Steps:");
+    for s in &plan.steps {
+        println!("  [{}] {}", s.id, s.description);
+        if let Some(a) = &s.suggested_action {
+            println!("      (hint) {a}");
+        }
+    }
+}
+
+pub(crate) async fn run(
+    config: &AppConfig,
+    cwd: &Path,
+    task: &str,
+    run_loop: bool,
+    status_only: bool,
+) -> ExitCode {
+    if status_only {
+        let path = plan_state_path(cwd);
+        if !path.is_file() {
+            println!("plan: no saved state at {}", path.display());
+            println!("hint: run `cantrik plan \"your task\"` first.");
+            return ExitCode::SUCCESS;
+        }
+        let text = match fs::read_to_string(&path) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("plan --status: {e}");
+                return ExitCode::FAILURE;
+            }
+        };
+        let state: PlanStateFile = match serde_json::from_str(&text) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("plan --status: corrupt state: {e}");
+                return ExitCode::FAILURE;
+            }
+        };
+        print_plan(&state.goal, &state.plan);
+        return ExitCode::SUCCESS;
+    }
+
     if task.trim().is_empty() {
-        eprintln!("plan: empty task");
+        eprintln!("plan: empty task (use `cantrik plan --status` to show saved plan)");
         return ExitCode::from(1);
     }
 
-    let prompt = format!(
-        "Produce a concise, ordered step-by-step plan (no execution yet) for the following goal:\n\n{}",
-        task.trim()
+    let goal = task.trim();
+    let gen_prompt = format!(
+        "Output ONLY valid JSON (no markdown fences, no commentary before or after) with this exact shape:\n\
+{{\"steps\":[{{\"id\":\"1\",\"description\":\"string\",\"suggested_action\":null}}]}}\n\n\
+Use short ids (1,2,3). suggested_action is optional string or null.\n\n\
+Task to plan:\n{goal}"
     );
 
-    let mut stdout = io::stdout().lock();
-    let result = session_llm::stream_with_session(cwd, config, &prompt, &mut |s| {
-        stdout
-            .write_all(s.as_bytes())
-            .map_err(|e| LlmError::Http(e.to_string()))?;
-        stdout.flush().map_err(|e| LlmError::Http(e.to_string()))?;
-        Ok(())
-    })
-    .await;
-
-    match result {
-        Ok(()) => {
-            let _ = writeln!(stdout);
-            ExitCode::SUCCESS
-        }
+    let raw = match session_llm::complete_with_session(cwd, config, &gen_prompt).await {
+        Ok(s) => s,
         Err(e) => {
             eprintln!("plan: {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    let plan = parse_plan_document(&raw).unwrap_or_else(|_| {
+        eprintln!("plan: (warn) could not parse JSON plan; using single manual step.");
+        Plan::single_manual(goal.to_string())
+    });
+
+    if let Err(e) = save_plan_state(cwd, goal, &plan) {
+        eprintln!("plan: could not save state: {e}");
+    }
+
+    print_plan(goal, &plan);
+
+    if !run_loop {
+        return ExitCode::SUCCESS;
+    }
+
+    let limits = PlanningLimits {
+        stuck_threshold_attempts: effective_stuck_threshold(&config.planning),
+        max_replan_cycles: effective_max_replan_cycles(&config.planning),
+    };
+
+    let handle = tokio::runtime::Handle::current();
+    let cwd_buf = cwd.to_path_buf();
+    let cfg = config.clone();
+    let goal_owned = goal.to_string();
+
+    let outcome = run_plan_loop(&goal_owned, plan, limits, |prompt| {
+        handle
+            .block_on(session_llm::complete_with_session(&cwd_buf, &cfg, prompt))
+            .map_err(|e| PlanLoopError::Llm(e.to_string()))
+    });
+
+    match outcome {
+        Ok(PlanOutcome::Completed) => {
+            println!("\nplan --run: all steps evaluated successfully (per model).");
+            ExitCode::SUCCESS
+        }
+        Ok(PlanOutcome::Escalated { message }) => {
+            eprintln!("\n{message}");
+            ExitCode::from(1)
+        }
+        Err(e) => {
+            eprintln!("plan --run: {e}");
             ExitCode::from(1)
         }
     }

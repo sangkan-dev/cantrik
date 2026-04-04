@@ -60,3 +60,18 @@ pub async fn stream_with_session(
     append_message(&pool, &sid, "assistant", &assistant).await?;
     Ok(())
 }
+
+/// Same as [`stream_with_session`] but returns the full assistant text (Sprint 10 planning / experiment).
+pub async fn complete_with_session(
+    cwd: &Path,
+    config: &AppConfig,
+    user_prompt: &str,
+) -> Result<String, SessionPromptError> {
+    let mut acc = String::new();
+    stream_with_session(cwd, config, user_prompt, &mut |s| {
+        acc.push_str(s);
+        Ok(())
+    })
+    .await?;
+    Ok(acc)
+}

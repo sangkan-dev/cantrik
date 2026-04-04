@@ -197,13 +197,15 @@ default_model = "llama-3.3-70b-versatile"
  
 **Goal:** Long-horizon Planning + Stuck Detection PRD (§4.4).
  
-- [ ] Mesin plan → act → evaluate; re-plan jika langkah gagal
-- [ ] Deteksi stuck (threshold default: 3 percobaan berbeda)
-- [ ] Eskalasi ke user dengan ringkasan percobaan yang sudah dilakukan
-- [ ] Integrasi ke subcommand `cantrik plan` dan perintah `/plan`
-- [ ] Experiment Mode (§4.21): eksekusi perubahan, run test/benchmark, auto-revert jika tidak ada improvement
+- [x] Mesin plan → act → evaluate; re-plan jika langkah gagal
+- [x] Deteksi stuck (threshold default: 3 percobaan berbeda)
+- [x] Eskalasi ke user dengan ringkasan percobaan yang sudah dilakukan
+- [x] Integrasi ke subcommand `cantrik plan` dan perintah `/plan`
+- [x] Experiment Mode (§4.21): eksekusi perubahan, run test/benchmark, auto-revert jika tidak ada improvement
  
 **Definition of Done:** Task multi-step bisa re-plan atau berhenti dengan pesan eskalasi jelas; experiment mode bisa revert otomatis.
+ 
+**Batas MVP Sprint 10:** “Act” pada loop plan memakai ringkasan simulasi (bukan eksekusi tool otomatis); evaluasi langkah memakai LLM + JSON; `cantrik plan --run` dan REPL `/plan` tanpa `--run` (generate + simpan state); experiment = JSON `writes` + exit code perintah `[planning].experiment_test_command` (default `cargo test`), rollback memanggil `revert_checkpoints_after_seq`; benchmark numerik ditunda.
  
 ---
  

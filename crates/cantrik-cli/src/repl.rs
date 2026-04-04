@@ -3,6 +3,7 @@
 use std::collections::VecDeque;
 use std::io::Result as IoResult;
 use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 
 use cantrik_core::config::AppConfig;
@@ -19,6 +20,7 @@ use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
 use tokio::runtime::Handle;
 
 use crate::commands::doctor;
+use crate::commands::plan as plan_cmd;
 
 const MAX_THINKING_LINES: usize = 48;
 const MAX_INPUT_HISTORY: usize = 100;
@@ -28,6 +30,7 @@ enum SlashCmd {
     Cost,
     Memory,
     Doctor,
+    Plan(Option<String>),
     Help,
     Exit,
     Unknown(String),
@@ -234,9 +237,7 @@ fn handle_line(
         match cmd {
             SlashCmd::Exit => return Ok(true),
             SlashCmd::Help => {
-                state.push_thinking(
-                    "/cost — usage cost (stub) · /memory — tiers · /doctor — health · /exit — quit",
-                );
+                state.push_thinking("/cost · /memory · /plan [task] · /doctor · /exit — try /help");
             }
             SlashCmd::Cost => {
                 let p = config.llm.provider.as_deref().unwrap_or("(unset)");
@@ -279,6 +280,36 @@ fn handle_line(
                 state.push_thinking("—— doctor ——".to_string());
                 for l in doctor::report_lines(cwd) {
                     state.push_thinking(l);
+                }
+            }
+            SlashCmd::Plan(task_opt) => {
+                let status_only = task_opt.is_none();
+                let task_s = task_opt.as_deref().unwrap_or("");
+                state.busy = true;
+                state.push_thinking(if status_only {
+                    "plan: loading saved state…".to_string()
+                } else {
+                    format!(
+                        "plan: generating structured plan… ({})",
+                        &task_s[..task_s.len().min(60)]
+                    )
+                });
+                let cfg = config.clone();
+                let cwd_buf = cwd.to_path_buf();
+                let code = rt.block_on(plan_cmd::run(
+                    &cfg,
+                    cwd_buf.as_path(),
+                    task_s,
+                    false,
+                    status_only,
+                ));
+                state.busy = false;
+                if code == ExitCode::SUCCESS {
+                    state.push_thinking("plan: done.".to_string());
+                } else {
+                    state.push_thinking(
+                        "plan: exited with error (see terminal if stderr).".to_string(),
+                    );
                 }
             }
             SlashCmd::Unknown(name) => {
@@ -346,11 +377,9 @@ fn parse_slash(line: &str) -> Option<SlashCmd> {
         return None;
     }
     let rest = t.strip_prefix('/')?.trim_start();
-    let mut parts = rest.split_whitespace();
-    let head = parts
-        .next()
-        .map(|s| s.to_ascii_lowercase())
-        .unwrap_or_default();
+    let end_head = rest.find(char::is_whitespace).unwrap_or(rest.len());
+    let head = rest[..end_head].to_ascii_lowercase();
+    let tail = rest[end_head..].trim();
     if head.is_empty() {
         return Some(SlashCmd::Help);
     }
@@ -358,6 +387,11 @@ fn parse_slash(line: &str) -> Option<SlashCmd> {
         "cost" => SlashCmd::Cost,
         "memory" => SlashCmd::Memory,
         "doctor" => SlashCmd::Doctor,
+        "plan" => SlashCmd::Plan(if tail.is_empty() {
+            None
+        } else {
+            Some(tail.to_string())
+        }),
         "help" | "?" => SlashCmd::Help,
         "exit" | "quit" => SlashCmd::Exit,
         other => SlashCmd::Unknown(other.to_string()),
@@ -433,5 +467,10 @@ mod tests {
             Some(SlashCmd::Unknown(x)) if x == "nope"
         ));
         assert!(parse_slash("hello").is_none());
+        assert!(matches!(parse_slash("/plan"), Some(SlashCmd::Plan(None))));
+        assert!(matches!(
+            parse_slash("/plan fix thing"),
+            Some(SlashCmd::Plan(Some(s))) if s == "fix thing"
+        ));
     }
 }

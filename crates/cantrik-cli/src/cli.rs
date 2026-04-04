@@ -48,10 +48,25 @@ pub enum Command {
         #[arg(trailing_var_arg = true, required = true, value_name = "QUERY")]
         query: Vec<String>,
     },
-    /// Plan a change before executing (planner wiring comes in later sprints).
+    /// Structured plan (JSON) under `.cantrik/plan-state.json`; `--run` runs evaluate/re-plan loop.
     Plan {
-        #[arg(trailing_var_arg = true, required = true, value_name = "TASK")]
+        #[arg(long)]
+        status: bool,
+        #[arg(long)]
+        run: bool,
+        #[arg(
+            trailing_var_arg = true,
+            required_unless_present = "status",
+            value_name = "TASK"
+        )]
         task: Vec<String>,
+    },
+    /// LLM proposes writes, run `[planning]` test command, revert checkpoints on failure.
+    Experiment {
+        #[arg(long)]
+        approve: bool,
+        #[arg(required = true, trailing_var_arg = true, value_name = "GOAL")]
+        goal: Vec<String>,
     },
     /// Index or refresh the codebase AST index (chunks + intra-file call graph under `.cantrik/index/ast/`).
     Index {

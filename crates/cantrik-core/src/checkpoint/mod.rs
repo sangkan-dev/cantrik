@@ -156,6 +156,33 @@ pub fn list_checkpoints(
     Ok(out)
 }
 
+/// Current value of the monotonic checkpoint counter (0 if never written).
+pub fn read_checkpoint_seq(project_root: &Path) -> u32 {
+    let seq_file = checkpoints_dir(project_root).join(".seq");
+    if !seq_file.is_file() {
+        return 0;
+    }
+    fs::read_to_string(&seq_file)
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0)
+}
+
+/// Apply checkpoints with `meta.seq` strictly greater than `seq_threshold`, newest first.
+/// Used to undo multiple writes after an experiment (Sprint 10).
+pub fn revert_checkpoints_after_seq(
+    project_root: &Path,
+    seq_threshold: u32,
+) -> Result<(), CheckpointError> {
+    let mut v = list_checkpoints(project_root)?;
+    v.retain(|(_, m)| m.seq > seq_threshold);
+    v.sort_by_key(|(_, m)| std::cmp::Reverse(m.seq));
+    for (dir, _) in v {
+        apply_checkpoint(project_root, &dir)?;
+    }
+    Ok(())
+}
+
 /// Latest checkpoint directory (highest seq).
 pub fn latest_checkpoint_dir(project_root: &Path) -> Result<Option<PathBuf>, CheckpointError> {
     let mut v = list_checkpoints(project_root)?;
@@ -267,6 +294,23 @@ mod tests {
         assert!(f.is_file());
         apply_checkpoint(&root, &cp_dir).expect("rollback");
         assert!(!f.exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn revert_checkpoints_after_seq_unwinds_writes() {
+        let root = temp_root("revseq");
+        fs::create_dir_all(root.join("src")).expect("mkdir");
+        let f = root.join("src/hello.txt");
+        fs::write(&f, "v1").expect("v1");
+        let start = read_checkpoint_seq(&root);
+        let abs = f.canonicalize().expect("canon");
+        snapshot_before_write(&root, &abs, None).expect("snap1");
+        fs::write(&f, "v2").expect("v2");
+        snapshot_before_write(&root, &abs, None).expect("snap2");
+        fs::write(&f, "v3").expect("v3");
+        revert_checkpoints_after_seq(&root, start).expect("revert");
+        assert_eq!(fs::read_to_string(&f).expect("read"), "v1");
         let _ = fs::remove_dir_all(&root);
     }
 }

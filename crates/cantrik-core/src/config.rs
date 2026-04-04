@@ -21,6 +21,8 @@ pub struct AppConfig {
     pub guardrails: GuardrailsConfig,
     #[serde(default)]
     pub audit: AuditTrackConfig,
+    #[serde(default)]
+    pub planning: PlanningConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -73,6 +75,17 @@ pub struct GuardrailsConfig {
     /// Tools that may run without a second prompt when autonomy allows (see docs).
     #[serde(default)]
     pub auto_approve: Vec<String>,
+}
+
+/// Planning / experiment loop (Sprint 10).
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct PlanningConfig {
+    /// Failures on the same step before stuck escalation (default 3).
+    pub stuck_threshold_attempts: Option<u32>,
+    /// Re-plan generations before forced escalation (default 2).
+    pub max_replan_cycles: Option<u32>,
+    /// argv for experiment verification (default `cargo test`).
+    pub experiment_test_command: Option<Vec<String>>,
 }
 
 /// Audit log / provenance toggles (Sprint 9).
@@ -170,8 +183,37 @@ impl AppConfig {
             audit: AuditTrackConfig {
                 provenance: override_config.audit.provenance.or(self.audit.provenance),
             },
+            planning: PlanningConfig {
+                stuck_threshold_attempts: override_config
+                    .planning
+                    .stuck_threshold_attempts
+                    .or(self.planning.stuck_threshold_attempts),
+                max_replan_cycles: override_config
+                    .planning
+                    .max_replan_cycles
+                    .or(self.planning.max_replan_cycles),
+                experiment_test_command: override_config
+                    .planning
+                    .experiment_test_command
+                    .clone()
+                    .or_else(|| self.planning.experiment_test_command.clone()),
+            },
         }
     }
+}
+
+pub fn effective_stuck_threshold(c: &PlanningConfig) -> u32 {
+    c.stuck_threshold_attempts.unwrap_or(3)
+}
+
+pub fn effective_max_replan_cycles(c: &PlanningConfig) -> u32 {
+    c.max_replan_cycles.unwrap_or(2)
+}
+
+pub fn effective_experiment_test_command(c: &PlanningConfig) -> Vec<String> {
+    c.experiment_test_command
+        .clone()
+        .unwrap_or_else(|| vec!["cargo".to_string(), "test".to_string()])
 }
 
 /// Whether to append provenance JSONL on successful writes.

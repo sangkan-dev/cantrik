@@ -93,6 +93,21 @@ pub async fn run() -> ExitCode {
             let g = words_to_line(goal);
             return commands::experiment_cmd::run(&config, &cwd, &g, *approve).await;
         }
+        Some(Command::Agents {
+            dry_run,
+            max_parallel,
+            goal,
+        }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(config) => config,
+                Err(error) => {
+                    eprintln!("failed to load config: {error}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            let g = words_to_line(goal);
+            return commands::agents_cmd::run(&config, &cwd, &g, *dry_run, *max_parallel).await;
+        }
         Some(Command::Session { sub }) => match sub {
             SessionCommand::List => commands::session_cmd::list_cmd(&cwd).await,
             SessionCommand::Show { limit } => commands::session_cmd::show_cmd(&cwd, *limit).await,

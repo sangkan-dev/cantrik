@@ -23,6 +23,8 @@ pub struct AppConfig {
     pub audit: AuditTrackConfig,
     #[serde(default)]
     pub planning: PlanningConfig,
+    #[serde(default)]
+    pub agents: AgentsConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -75,6 +77,17 @@ pub struct GuardrailsConfig {
     /// Tools that may run without a second prompt when autonomy allows (see docs).
     #[serde(default)]
     pub auto_approve: Vec<String>,
+}
+
+/// Multi-agent orchestration (Sprint 11, PRD §4.2).
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct AgentsConfig {
+    /// Max nested spawn depth (default 3); MVP entry uses depth 0 only.
+    pub max_spawn_depth: Option<u8>,
+    /// Concurrent sub-agent LLM calls (default 4).
+    pub max_parallel_subagents: Option<u32>,
+    /// Truncate sub-agent summary for synthesis prompt (default 2000).
+    pub subagent_summary_max_chars: Option<u32>,
 }
 
 /// Planning / experiment loop (Sprint 10).
@@ -198,6 +211,20 @@ impl AppConfig {
                     .clone()
                     .or_else(|| self.planning.experiment_test_command.clone()),
             },
+            agents: AgentsConfig {
+                max_spawn_depth: override_config
+                    .agents
+                    .max_spawn_depth
+                    .or(self.agents.max_spawn_depth),
+                max_parallel_subagents: override_config
+                    .agents
+                    .max_parallel_subagents
+                    .or(self.agents.max_parallel_subagents),
+                subagent_summary_max_chars: override_config
+                    .agents
+                    .subagent_summary_max_chars
+                    .or(self.agents.subagent_summary_max_chars),
+            },
         }
     }
 }
@@ -214,6 +241,18 @@ pub fn effective_experiment_test_command(c: &PlanningConfig) -> Vec<String> {
     c.experiment_test_command
         .clone()
         .unwrap_or_else(|| vec!["cargo".to_string(), "test".to_string()])
+}
+
+pub fn effective_max_spawn_depth(c: &AgentsConfig) -> u8 {
+    c.max_spawn_depth.unwrap_or(3)
+}
+
+pub fn effective_max_parallel_subagents(c: &AgentsConfig) -> usize {
+    c.max_parallel_subagents.unwrap_or(4).max(1) as usize
+}
+
+pub fn effective_subagent_summary_max_chars(c: &AgentsConfig) -> usize {
+    c.subagent_summary_max_chars.unwrap_or(2000).max(256) as usize
 }
 
 /// Whether to append provenance JSONL on successful writes.

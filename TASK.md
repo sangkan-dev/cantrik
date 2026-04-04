@@ -213,14 +213,16 @@ default_model = "llama-3.3-70b-versatile"
  
 **Goal:** Multi-Agent Orchestration PRD (§4.2).
  
-- [ ] Orchestrator + konteks sub-agent terpisah (isolated context window)
-- [ ] Eksekusi paralel via `tokio`
-- [ ] Summary propagation ke orchestrator (hemat token)
-- [ ] Batas kedalaman spawn (default: 3)
-- [ ] Failure isolation — satu sub-agent gagal tidak stop yang lain
-- [ ] Structured Plan & Act Mode — stub awal: Planner (read-only) + Builder (approval) (§4.12 PRD)
+- [x] Orchestrator + konteks sub-agent terpisah (isolated context window)
+- [x] Eksekusi paralel via `tokio`
+- [x] Summary propagation ke orchestrator (hemat token)
+- [x] Batas kedalaman spawn (default: 3)
+- [x] Failure isolation — satu sub-agent gagal tidak stop yang lain
+- [x] Structured Plan & Act Mode — stub awal: Planner (read-only) + Builder (approval) (§4.12 PRD)
  
 **Definition of Done:** Task terdekomposisi ke beberapa sub-agent paralel; Planner dapat berjalan tanpa akses write.
+ 
+**Batas MVP Sprint 11:** Sub-agent memakai `llm::ask_complete_text` (ephemeral, tanpa `append_message` ke SQLite); rekursi sub-agent → sub-agent belum diimplementasikan (hanya API `depth` + penolakan jika `depth >= max_spawn_depth`); Reviewer §4.12 ditunda; Builder = stub teks LLM (bukan eksekusi tool otomatis).
  
 ---
  

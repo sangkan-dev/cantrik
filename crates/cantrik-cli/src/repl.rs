@@ -19,6 +19,7 @@ use ratatui::style::{Color, Style};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
 use tokio::runtime::Handle;
 
+use crate::commands::agents_cmd;
 use crate::commands::doctor;
 use crate::commands::plan as plan_cmd;
 
@@ -31,6 +32,7 @@ enum SlashCmd {
     Memory,
     Doctor,
     Plan(Option<String>),
+    Agents(Option<String>),
     Help,
     Exit,
     Unknown(String),
@@ -237,7 +239,9 @@ fn handle_line(
         match cmd {
             SlashCmd::Exit => return Ok(true),
             SlashCmd::Help => {
-                state.push_thinking("/cost · /memory · /plan [task] · /doctor · /exit — try /help");
+                state.push_thinking(
+                    "/cost · /memory · /plan · /agents <goal> · /doctor · /exit — try /help",
+                );
             }
             SlashCmd::Cost => {
                 let p = config.llm.provider.as_deref().unwrap_or("(unset)");
@@ -280,6 +284,34 @@ fn handle_line(
                 state.push_thinking("—— doctor ——".to_string());
                 for l in doctor::report_lines(cwd) {
                     state.push_thinking(l);
+                }
+            }
+            SlashCmd::Agents(goal_opt) => {
+                let Some(goal_s) = goal_opt.as_deref() else {
+                    state.push_thinking(
+                        "agents: usage /agents <goal> (multi-agent orchestrator)".to_string(),
+                    );
+                    return Ok(false);
+                };
+                state.busy = true;
+                state.push_thinking(format!(
+                    "agents: orchestrator… ({})",
+                    &goal_s[..goal_s.len().min(60)]
+                ));
+                let cfg = config.clone();
+                let cwd_buf = cwd.to_path_buf();
+                let code = rt.block_on(agents_cmd::run(
+                    &cfg,
+                    cwd_buf.as_path(),
+                    goal_s,
+                    false,
+                    None,
+                ));
+                state.busy = false;
+                if code == ExitCode::SUCCESS {
+                    state.push_thinking("agents: done.".to_string());
+                } else {
+                    state.push_thinking("agents: error (see stderr).".to_string());
                 }
             }
             SlashCmd::Plan(task_opt) => {
@@ -392,6 +424,11 @@ fn parse_slash(line: &str) -> Option<SlashCmd> {
         } else {
             Some(tail.to_string())
         }),
+        "agents" => SlashCmd::Agents(if tail.is_empty() {
+            None
+        } else {
+            Some(tail.to_string())
+        }),
         "help" | "?" => SlashCmd::Help,
         "exit" | "quit" => SlashCmd::Exit,
         other => SlashCmd::Unknown(other.to_string()),
@@ -471,6 +508,10 @@ mod tests {
         assert!(matches!(
             parse_slash("/plan fix thing"),
             Some(SlashCmd::Plan(Some(s))) if s == "fix thing"
+        ));
+        assert!(matches!(
+            parse_slash("/agents do x"),
+            Some(SlashCmd::Agents(Some(s))) if s == "do x"
         ));
     }
 }

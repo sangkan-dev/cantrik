@@ -68,6 +68,15 @@ pub enum Command {
         #[arg(required = true, trailing_var_arg = true, value_name = "GOAL")]
         goal: Vec<String>,
     },
+    /// Multi-agent orchestrator: Planner decompose, parallel ephemeral workers, synthesize, Builder stub.
+    Agents {
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long, value_name = "N")]
+        max_parallel: Option<usize>,
+        #[arg(required = true, trailing_var_arg = true, value_name = "GOAL")]
+        goal: Vec<String>,
+    },
     /// Index or refresh the codebase AST index (chunks + intra-file call graph under `.cantrik/index/ast/`).
     Index {
         /// Skip Ollama embedding + LanceDB step after AST index.

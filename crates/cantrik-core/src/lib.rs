@@ -3,6 +3,7 @@ pub mod checkpoint;
 pub mod config;
 pub mod indexing;
 pub mod llm;
+pub mod multi_agent;
 pub mod planning;
 pub mod provenance;
 pub mod search;

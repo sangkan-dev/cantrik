@@ -1,3 +1,4 @@
+pub(crate) mod agents_cmd;
 pub(crate) mod ask;
 pub(crate) mod completions;
 pub(crate) mod doctor;

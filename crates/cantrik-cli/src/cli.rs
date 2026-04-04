@@ -97,6 +97,15 @@ pub enum Command {
         #[arg(long, default_value_t = 2_000_000_u64)]
         max_bytes: u64,
     },
+    /// Restore files from a pre-write checkpoint under `.cantrik/checkpoints/`.
+    Rollback {
+        /// List checkpoints for this project.
+        #[arg(long)]
+        list: bool,
+        /// Checkpoint id (`001`) or folder substring; omit to restore the latest.
+        #[arg(value_name = "ID")]
+        id: Option<String>,
+    },
     /// Semantic search over the local vector index (requires Ollama + prior `cantrik index`).
     Search {
         /// Project root (default: current directory).

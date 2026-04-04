@@ -153,6 +153,9 @@ pub async fn run() -> ExitCode {
             };
             return commands::fetch_cmd::run(&config, url, *approve, *max_bytes).await;
         }
+        Some(Command::Rollback { list, id }) => {
+            commands::rollback_cmd::run(&cwd, *list, id.as_deref())
+        }
         Some(Command::Index { path, no_vectors }) => {
             let config = match load_merged_config(&cwd) {
                 Ok(config) => config,

@@ -8,6 +8,7 @@ pub(crate) mod git_cmd;
 pub(crate) mod index;
 pub(crate) mod plan;
 pub(crate) mod rgrep_cmd;
+pub(crate) mod rollback_cmd;
 pub(crate) mod search;
 pub(crate) mod session_cmd;
 pub(crate) mod session_llm;

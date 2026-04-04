@@ -19,6 +19,8 @@ pub struct AppConfig {
     pub sandbox: SandboxConfig,
     #[serde(default)]
     pub guardrails: GuardrailsConfig,
+    #[serde(default)]
+    pub audit: AuditTrackConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -71,6 +73,14 @@ pub struct GuardrailsConfig {
     /// Tools that may run without a second prompt when autonomy allows (see docs).
     #[serde(default)]
     pub auto_approve: Vec<String>,
+}
+
+/// Audit log / provenance toggles (Sprint 9).
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct AuditTrackConfig {
+    /// `file` (default when unset) appends `.cantrik/provenance.jsonl` on write; `off` disables.
+    #[serde(default)]
+    pub provenance: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -157,8 +167,16 @@ impl AppConfig {
                     &override_config.guardrails.auto_approve,
                 ),
             },
+            audit: AuditTrackConfig {
+                provenance: override_config.audit.provenance.or(self.audit.provenance),
+            },
         }
     }
+}
+
+/// Whether to append provenance JSONL on successful writes.
+pub fn provenance_file_enabled(c: &AuditTrackConfig) -> bool {
+    !matches!(c.provenance.as_deref(), Some("off"))
 }
 
 /// Resolved sandbox level (`None` in config → restricted).

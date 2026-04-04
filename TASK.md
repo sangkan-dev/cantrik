@@ -181,13 +181,15 @@ default_model = "llama-3.3-70b-versatile"
  
 **Goal:** Checkpointing & Rollback + Audit Log PRD (§4.5, §5).
  
-- [ ] Auto checkpoint sebelum operasi write (`.cantrik/checkpoints/`)
-- [ ] Perintah `rollback` + `rollback --list` + `rollback <id>`
-- [ ] Audit log append-only (`~/.local/share/cantrik/audit.log`) sesuai contoh PRD
-- [ ] Cost tracking per aksi / model — disiapkan untuk `/cost` command
-- [ ] Provenance metadata per baris kode yang ditulis Cantrik (§4.10 PRD) — inline comment atau `.cantrik/provenance.json`
+- [x] Auto checkpoint sebelum operasi write (`.cantrik/checkpoints/`)
+- [x] Perintah `rollback` + `rollback --list` + `rollback <id>`
+- [x] Audit log append-only (`~/.local/share/cantrik/audit.log`) sesuai contoh PRD
+- [x] Cost tracking per aksi / model — disiapkan untuk `/cost` command
+- [x] Provenance metadata per baris kode yang ditulis Cantrik (§4.10 PRD) — `.cantrik/provenance.jsonl` (file-first; inline comment ditunda)
  
 **Definition of Done:** Satu alur tulis file bisa di-rollback; aksi tercatat di audit dengan cost.
+ 
+**Batas MVP Sprint 9:** Harga API riil dan agregasi `/cost` belum — field `cost` di audit stub (`0.0`); provenance via `provenance.jsonl` + `[audit] provenance = "off"`; `CANTRIK_AUDIT_LOG` override path audit; multi-file checkpoint tunggal per write (bukan transaksi batch).
  
 ---
  

@@ -7,7 +7,10 @@ use std::time::Duration;
 use reqwest::Client;
 use thiserror::Error;
 
-use crate::config::{AppConfig, effective_sandbox_level};
+use crate::audit;
+use crate::checkpoint;
+use crate::config::{AppConfig, effective_sandbox_level, provenance_file_enabled};
+use crate::provenance;
 use crate::tools::{ToolError as FileToolError, read_file_capped};
 use crate::tools::{WriteApproval, commit_write};
 
@@ -103,7 +106,26 @@ pub fn tool_write_file(
 ) -> Result<(), ToolSystemError> {
     require_not_forbidden(config, ToolId::WriteFile)?;
     let p = resolve_write_target(path, project_root)?;
-    Ok(commit_write(&p, contents, approval)?)
+    let task = std::env::var("CANTRIK_TASK").ok();
+    checkpoint::snapshot_before_write(project_root, &p, task.as_deref())
+        .map_err(|e| ToolSystemError::Policy(format!("checkpoint: {e}")))?;
+    commit_write(&p, contents, approval)?;
+    let root = project_root.canonicalize().map_err(ToolSystemError::Io)?;
+    let rel = p
+        .strip_prefix(&root)
+        .map(|x| x.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|_| p.to_string_lossy().into_owned());
+    let line = audit::format_write_audit(
+        &rel,
+        config.llm.provider.as_deref(),
+        config.llm.model.as_deref(),
+        contents,
+    );
+    let _ = audit::append_audit_line(line.trim_end());
+    if provenance_file_enabled(&config.audit) {
+        let _ = provenance::append_provenance_record(project_root, &rel, config.llm.model.clone());
+    }
+    Ok(())
 }
 
 /// Run subprocess with `ExecApproval` and sandbox level from config.
@@ -123,7 +145,10 @@ pub fn tool_run_command(
     let mut cmd = command_for_exec(program, args, cwd, level).map_err(ToolSystemError::Policy)?;
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
-    cmd.output().map_err(ToolSystemError::Io)
+    let out = cmd.output().map_err(ToolSystemError::Io)?;
+    let line = audit::format_exec_audit(program, args);
+    let _ = audit::append_audit_line(line.trim_end());
+    Ok(out)
 }
 
 const RG_BIN: &str = "rg";
@@ -208,6 +233,8 @@ pub async fn tool_web_fetch(
             "response body exceeds {max_bytes} bytes"
         )));
     }
+    let line = audit::format_fetch_audit(url, body.len());
+    let _ = audit::append_audit_line(line.trim_end());
     Ok(body.to_vec())
 }
 
@@ -244,5 +271,43 @@ mod tests {
         let tmp = std::env::temp_dir();
         let err = tool_read_file(&c, tmp.as_path(), Path::new("/etc/passwd"), 1024);
         assert!(matches!(err, Err(ToolSystemError::PathOutsideProject(_))));
+    }
+
+    #[test]
+    fn write_twice_then_rollback_restores_first_content() {
+        use crate::checkpoint::{apply_checkpoint, latest_checkpoint_dir};
+        use crate::tools::WriteApproval;
+
+        let root =
+            std::env::temp_dir().join(format!("cantrik-dispatch-rollback-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("src")).expect("mkdir");
+        let root = root.canonicalize().expect("canon");
+
+        let c = AppConfig::default();
+        let rel = Path::new("src").join("roll.txt");
+        let approve = WriteApproval::user_confirmed_after_reviewing_diff();
+
+        tool_write_file(&c, &root, &rel, "first", approve).expect("write 1");
+        tool_write_file(
+            &c,
+            &root,
+            &rel,
+            "second",
+            WriteApproval::user_confirmed_after_reviewing_diff(),
+        )
+        .expect("write 2");
+
+        let p = root.join(&rel);
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), "second");
+
+        let cp = latest_checkpoint_dir(&root)
+            .expect("list")
+            .expect("some checkpoint");
+        apply_checkpoint(&root, &cp).expect("rollback");
+
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), "first");
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

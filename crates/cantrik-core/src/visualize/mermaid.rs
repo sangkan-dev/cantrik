@@ -110,7 +110,7 @@ pub fn mermaid_dependencies_from_cargo_tree_stdout(tree: &str) -> String {
         if t.is_empty() {
             continue;
         }
-        let rest = t.trim_start_matches(|c: char| matches!(c, '│' | '├' | '└' | '─' | ' '));
+        let rest = t.trim_start_matches(['│', '├', '└', '─', ' ']);
         let token = rest.split_whitespace().next().unwrap_or("");
         if token.is_empty() || token == "(*)" {
             continue;
@@ -118,10 +118,9 @@ pub fn mermaid_dependencies_from_cargo_tree_stdout(tree: &str) -> String {
         if token
             .chars()
             .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+            && set.insert(token.to_string())
         {
-            if set.insert(token.to_string()) {
-                order.push(token.to_string());
-            }
+            order.push(token.to_string());
         }
     }
     if order.is_empty() {

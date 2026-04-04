@@ -402,7 +402,7 @@ mod fingerprint_tests {
         fs::create_dir_all(&b).expect("mkdir b");
         let bc = fs::canonicalize(&b).expect("canon b");
         let solo = project_fingerprint(&a);
-        let merged = project_fingerprint_with_workspace(&a, &[bc.clone()]);
+        let merged = project_fingerprint_with_workspace(&a, std::slice::from_ref(&bc));
         assert_ne!(solo, merged);
         let merged2 = project_fingerprint_with_workspace(&a, &[bc]);
         assert_eq!(merged, merged2);

@@ -7,8 +7,11 @@ pub fn changed_new_line_indices(old_text: &str, new_text: &str) -> Vec<usize> {
     for change in diff.iter_all_changes() {
         let tag = change.tag();
         let value = change.value();
+        // `similar` chunks often end with `\n`; count logical lines without double-counting the terminator.
         let line_count = if value.is_empty() {
             0
+        } else if value.ends_with('\n') {
+            value.matches('\n').count().max(1)
         } else {
             value.matches('\n').count() + 1
         };

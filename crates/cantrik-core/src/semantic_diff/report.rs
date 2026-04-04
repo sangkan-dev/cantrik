@@ -49,9 +49,7 @@ pub fn build_semantic_report(
 ) -> Result<SemanticReport, GitWorkspaceError> {
     let mut paths = changed_paths(project_root, staged)?;
     if let Some(cap) = max_files.filter(|n| *n > 0) {
-        if paths.len() > cap {
-            paths.truncate(cap);
-        }
+        paths.truncate(cap);
     }
     let chunks_map = chunks_by_path(project_root).unwrap_or_default();
     let index_present = !chunks_map.is_empty();
@@ -76,20 +74,21 @@ pub fn build_semantic_report(
         let mut affected_symbols = Vec::new();
         let mut callers = Vec::new();
 
-        if include_semantic_from_index && index_present {
-            if let Some(chunks) = chunks_map.get(rel) {
-                let lines = changed_new_line_indices(&old, &new);
-                let affected = affected_chunks_for_path(chunks, &lines);
-                let sym: HashSet<String> = affected.iter().map(|c| c.symbol.clone()).collect();
-                affected_symbols = sym.iter().cloned().collect();
-                affected_symbols.sort();
-                let ce = callers_for_symbols(rel, &sym, &edges);
-                callers = ce
-                    .iter()
-                    .map(|e| format!("{} (line {}) calls {}", e.caller, e.line, e.callee))
-                    .collect();
-                callers.sort();
-            }
+        if include_semantic_from_index
+            && index_present
+            && let Some(chunks) = chunks_map.get(rel)
+        {
+            let lines = changed_new_line_indices(&old, &new);
+            let affected = affected_chunks_for_path(chunks, &lines);
+            let sym: HashSet<String> = affected.iter().map(|c| c.symbol.clone()).collect();
+            affected_symbols = sym.iter().cloned().collect();
+            affected_symbols.sort();
+            let ce = callers_for_symbols(rel, &sym, &edges);
+            callers = ce
+                .iter()
+                .map(|e| format!("{} (line {}) calls {}", e.caller, e.line, e.callee))
+                .collect();
+            callers.sort();
         }
 
         files_out.push(FileSemanticEntry {

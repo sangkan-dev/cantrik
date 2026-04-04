@@ -305,6 +305,7 @@ mod tests {
     static MEMORY_DB_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
     async fn import_bundle_writes_dot_cantrik_files() {
         let _lock = MEMORY_DB_TEST_LOCK.lock().expect("memory db test lock");
         let dir = tempfile::tempdir().expect("tmpdir");

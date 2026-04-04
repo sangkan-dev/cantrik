@@ -50,7 +50,7 @@ pub struct LlmUsageContext<'a> {
 }
 
 fn apply_auto_route(
-    chain: &mut Vec<ProviderTarget>,
+    chain: &mut [ProviderTarget],
     providers: &ProvidersToml,
     user_facing_prompt: &str,
 ) -> Result<(), ProvidersLoadError> {
@@ -64,10 +64,9 @@ fn apply_auto_route(
         return Ok(());
     };
     let tier = classify_prompt(user_facing_prompt);
-    if let Some(tgt) = resolve_routed_target(tier, th, providers)? {
-        if !chain.is_empty() {
-            chain[0] = tgt;
-        }
+    match resolve_routed_target(tier, th, providers)? {
+        Some(tgt) if !chain.is_empty() => chain[0] = tgt,
+        _ => {}
     }
     Ok(())
 }
@@ -307,8 +306,8 @@ pub async fn ask_complete_text_with(
 #[cfg(test)]
 mod routing_tests {
     use super::providers::{
-        AnthropicSection, GeminiSection, OllamaSection, ProviderKind, ProviderSections,
-        ProviderTarget, ProvidersToml, RoutingSection, RoutingThresholds, build_attempt_chain,
+        AnthropicSection, OllamaSection, ProviderKind, ProviderSections, ProvidersToml,
+        RoutingSection, RoutingThresholds, build_attempt_chain,
     };
     use super::{apply_auto_route, classify_prompt};
 

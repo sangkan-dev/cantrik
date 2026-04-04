@@ -76,14 +76,13 @@ pub async fn run() -> ExitCode {
                 );
                 return ExitCode::from(2);
             }
-            let config = match load_merged_config(&cwd) {
-                Ok(config) => config,
+            match load_merged_config(&cwd) {
+                Ok(config) => commands::serve_mcp::run_mcp_stdio(config).await,
                 Err(error) => {
                     eprintln!("failed to load config: {error}");
-                    return ExitCode::FAILURE;
+                    ExitCode::FAILURE
                 }
-            };
-            return commands::serve_mcp::run_mcp_stdio(config).await;
+            }
         }
         Some(Command::Mcp { sub }) => match sub {
             McpCommand::Call { server, tool, json } => {

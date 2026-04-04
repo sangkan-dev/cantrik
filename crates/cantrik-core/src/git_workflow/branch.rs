@@ -8,8 +8,6 @@ pub fn sanitize_task_slug(raw: &str) -> String {
         .map(|c| {
             if c.is_ascii_alphanumeric() {
                 c.to_ascii_lowercase()
-            } else if c.is_whitespace() || c == '-' || c == '_' {
-                '-'
             } else {
                 '-'
             }

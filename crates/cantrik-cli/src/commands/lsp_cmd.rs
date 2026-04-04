@@ -1,8 +1,8 @@
 //! LSP server over stdio (Sprint 18): symbols from `.cantrik/index/ast/chunks.jsonl`.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use cantrik_core::indexing::{load_chunks_for_document, outlines_from_chunks};
 use tokio::sync::RwLock;
@@ -24,12 +24,13 @@ struct Backend {
 }
 
 fn resolve_workspace_root(params: &InitializeParams) -> Option<PathBuf> {
-    if let Some(folders) = &params.workspace_folders {
-        if let Some(first) = folders.first() {
-            return first.uri.to_file_path().ok();
-        }
+    if let Some(folders) = &params.workspace_folders
+        && let Some(first) = folders.first()
+    {
+        first.uri.to_file_path().ok()
+    } else {
+        params.root_uri.as_ref().and_then(|u| u.to_file_path().ok())
     }
-    params.root_uri.as_ref().and_then(|u| u.to_file_path().ok())
 }
 
 fn map_chunk_kind(s: &str) -> SymbolKind {
@@ -67,7 +68,6 @@ impl LanguageServer for Backend {
                 name: "cantrik".to_string(),
                 version: Some(env!("CARGO_PKG_VERSION").to_string()),
             }),
-            ..Default::default()
         })
     }
 

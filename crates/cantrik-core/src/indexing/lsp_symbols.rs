@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use super::{ast_index_dir, chunks_path, read_all_source_chunks, IndexError, SourceChunk};
+use super::{IndexError, SourceChunk, ast_index_dir, chunks_path, read_all_source_chunks};
 
 /// Symbol span derived from indexed chunks (no LSP types in core).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,7 +41,7 @@ pub fn load_chunks_for_document(
 }
 
 pub fn outlines_from_chunks(chunks: &[SourceChunk]) -> Vec<IndexedSymbolOutline> {
-    chunks.iter().map(|c| outline_from_chunk(c)).collect()
+    chunks.iter().map(outline_from_chunk).collect()
 }
 
 fn outline_from_chunk(c: &SourceChunk) -> IndexedSymbolOutline {

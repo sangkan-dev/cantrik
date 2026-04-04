@@ -74,7 +74,7 @@ fn run_git_blame(
             return Err(IntelligenceError::Msg("line must be >= 1".into()));
         }
         // Window around the line of interest.
-        let span = max_lines.max(1).min(500) as u32;
+        let span = max_lines.clamp(1, 500) as u32;
         cmd.arg("-L").arg(format!("{},+{}", l, span));
     }
     cmd.arg("--").arg(rel);

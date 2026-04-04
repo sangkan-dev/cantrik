@@ -20,7 +20,7 @@ pub fn gather_teach_context(
     project_root: &Path,
     max_files: usize,
 ) -> Result<String, IntelligenceError> {
-    let cap_dirs = max_files.min(64).max(8);
+    let cap_dirs = max_files.clamp(8, 64);
     let top_dirs = list_top_level_dirs(project_root, cap_dirs)?;
     let readmes = gather_readme_excerpts(project_root, 3, 1200)?;
     let crates = list_workspace_crate_dirs(project_root, cap_dirs);
@@ -189,8 +189,7 @@ fn ast_index_summary(project_root: &Path, max_symbols: usize) -> Result<String, 
     let mut paths: Vec<_> = by_path.keys().cloned().collect();
     paths.sort();
     let mut lines = Vec::new();
-    let mut n = 0usize;
-    for path in paths {
+    for (n, path) in paths.into_iter().enumerate() {
         if n >= max_symbols {
             lines.push("… (truncated)".into());
             break;
@@ -198,7 +197,6 @@ fn ast_index_summary(project_root: &Path, max_symbols: usize) -> Result<String, 
         let syms = &by_path[&path];
         let head: Vec<_> = syms.iter().take(5).cloned().collect();
         lines.push(format!("{}: {}", path, head.join(", ")));
-        n += 1;
     }
     Ok(lines.join("\n"))
 }

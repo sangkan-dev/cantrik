@@ -57,7 +57,7 @@ pub fn count_crate_mentions_in_manifests(
 ) -> usize {
     let mut count = 0;
     let mut scanned = 0usize;
-    let needle = format!("{crate_name}");
+    let needle = crate_name.to_string();
     walk_cargo_tomls(project_root, max_files, &mut scanned, &mut |body| {
         if body.contains(&needle) {
             // Prefer word-ish match: name in dependency table
@@ -95,11 +95,11 @@ fn walk_cargo_tomls(dir: &Path, max_files: usize, scanned: &mut usize, f: &mut i
             walk_cargo_tomls(&p, max_files, scanned, f);
             continue;
         }
-        if name == "Cargo.toml" {
-            if let Ok(body) = fs::read_to_string(&p) {
-                *scanned += 1;
-                f(&body);
-            }
+        if name == "Cargo.toml"
+            && let Ok(body) = fs::read_to_string(&p)
+        {
+            *scanned += 1;
+            f(&body);
         }
     }
 }

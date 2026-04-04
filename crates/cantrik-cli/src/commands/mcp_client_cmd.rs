@@ -46,7 +46,7 @@ fn find_server<'a>(
     })
 }
 
-pub async fn call_tool(
+async fn call_tool(
     _cwd: &Path,
     server_name: &str,
     tool_name: &str,

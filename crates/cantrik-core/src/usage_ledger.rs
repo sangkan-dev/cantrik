@@ -46,6 +46,7 @@ pub async fn month_spend_usd(
     Ok(v.unwrap_or(0.0))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn insert_llm_usage(
     pool: &SqlitePool,
     session_id: Option<&str>,

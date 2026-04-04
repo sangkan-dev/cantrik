@@ -230,12 +230,14 @@ default_model = "llama-3.3-70b-versatile"
  
 **Goal:** Background Agent Mode PRD (§4.3).
  
-- [ ] Mode background / long-running + persist progress ke SQLite
-- [ ] Integrasi daemon: systemd user service (Linux) / launchd (macOS)
-- [ ] Notifikasi saat perlu approval: desktop (notify-send / osascript), webhook URL, file flag
-- [ ] `cantrik status` — cek progress task background
+- [x] Mode background / long-running + persist progress ke SQLite (`background_jobs`, `cantrik background`, `cantrik daemon`)
+- [x] Integrasi daemon: contoh systemd user unit (`contrib/systemd/cantrik-daemon.service`) dan launchd (`contrib/launchd/com.cantrik.daemon.plist`)
+- [x] Notifikasi saat perlu approval: desktop (`notify-send` / `osascript`), webhook `[background].webhook_url`, file flag (default `~/.local/share/cantrik/approval-pending.flag`)
+- [x] `cantrik status` — cek progress task background (`--all` = semua proyek di DB)
  
 **Definition of Done:** Task panjang tetap berjalan setelah terminal tertutup; notifikasi terkirim saat approval dibutuhkan.
+
+**Batas MVP (Sprint 12):** Runner daemon memanggil satu putaran `complete_with_session` per siklus klaim job; setelah setiap putaran (jika belum mencapai `[background].max_llm_rounds`, default **2**) job masuk `waiting_approval` dan user melanjutkan dengan `cantrik background resume <id>`. Set `max_llm_rounds = 1` untuk satu putaran lalu `completed` tanpa jeda approval. Gate “approval” sebelum tool tulis penuh belum diintegrasikan ke orkestrator multi-tool — hanya jeda antar putaran LLM. Checkpoint per langkah di filesystem tidak wajib; heartbeat + state ada di SQLite.
  
 ---
  

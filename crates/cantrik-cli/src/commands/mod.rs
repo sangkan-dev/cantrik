@@ -1,6 +1,8 @@
 pub(crate) mod agents_cmd;
 pub(crate) mod ask;
+pub(crate) mod background_cmd;
 pub(crate) mod completions;
+pub(crate) mod daemon_cmd;
 pub(crate) mod doctor;
 pub(crate) mod exec_cmd;
 pub(crate) mod experiment_cmd;
@@ -14,3 +16,4 @@ pub(crate) mod rollback_cmd;
 pub(crate) mod search;
 pub(crate) mod session_cmd;
 pub(crate) mod session_llm;
+pub(crate) mod status_cmd;

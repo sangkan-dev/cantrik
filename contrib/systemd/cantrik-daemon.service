@@ -1,0 +1,17 @@
+# Example user unit for Linux (Sprint 12).
+# Install: mkdir -p ~/.config/systemd/user && cp this file there, set ExecStart to full path to cantrik, then:
+#   systemctl --user daemon-reload && systemctl --user enable --now cantrik-daemon.service
+# Logs: journalctl --user -u cantrik-daemon.service -f
+
+[Unit]
+Description=Cantrik background job daemon (SQLite queue)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=cantrik daemon
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

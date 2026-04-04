@@ -130,6 +130,26 @@ pub enum Command {
         #[arg(value_name = "ID")]
         id: Option<String>,
     },
+    /// Queue a background goal for `cantrik daemon`, or `cantrik background resume <id>`.
+    Background {
+        /// Skip desktop/webhook/file notification when the job needs approval (default: notify).
+        #[arg(long)]
+        no_notify: bool,
+        #[arg(required = true, trailing_var_arg = true, value_name = "ARGS")]
+        args: Vec<String>,
+    },
+    /// List background jobs for this project (`--all` for every project in the DB).
+    Status {
+        #[arg(long)]
+        all: bool,
+        #[arg(long, default_value_t = 50_i64)]
+        limit: i64,
+    },
+    /// Long-running worker: claims queued background jobs and runs a bounded LLM round each time.
+    Daemon {
+        #[arg(long, default_value_t = 2_u64)]
+        poll_secs: u64,
+    },
     /// Semantic search over the local vector index (requires Ollama + prior `cantrik index`).
     Search {
         /// Project root (default: current directory).

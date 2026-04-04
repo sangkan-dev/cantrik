@@ -192,6 +192,15 @@ pub async fn run() -> ExitCode {
             };
             commands::index::run(&config, path.as_deref(), *no_vectors).await
         }
+        Some(Command::Background { no_notify, args }) => {
+            commands::background_cmd::run(&cwd, !*no_notify, args).await
+        }
+        Some(Command::Status { all, limit }) => {
+            commands::status_cmd::run(&cwd, *all, *limit).await
+        }
+        Some(Command::Daemon { poll_secs }) => {
+            commands::daemon_cmd::run(*poll_secs).await
+        }
         Some(Command::Search {
             project,
             limit,
@@ -375,6 +384,24 @@ mod tests {
                 assert!(path.is_none());
             }
             _ => panic!("expected index"),
+        }
+    }
+
+    #[test]
+    fn parse_background_resume_and_goal() {
+        let cli = Cli::try_parse_from(["cantrik", "background", "resume", "abc-uuid"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Background { no_notify, args } => {
+                assert!(!no_notify);
+                assert_eq!(args, vec!["resume", "abc-uuid"]);
+            }
+            _ => panic!("expected background"),
+        }
+
+        let cli = Cli::try_parse_from(["cantrik", "background", "fix", "tests"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Background { args, .. } => assert_eq!(args, vec!["fix", "tests"]),
+            _ => panic!("expected background"),
         }
     }
 }

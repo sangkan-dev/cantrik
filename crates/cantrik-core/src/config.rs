@@ -25,6 +25,8 @@ pub struct AppConfig {
     pub planning: PlanningConfig,
     #[serde(default)]
     pub agents: AgentsConfig,
+    #[serde(default)]
+    pub background: BackgroundConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -88,6 +90,19 @@ pub struct AgentsConfig {
     pub max_parallel_subagents: Option<u32>,
     /// Truncate sub-agent summary for synthesis prompt (default 2000).
     pub subagent_summary_max_chars: Option<u32>,
+}
+
+/// Background daemon jobs + approval notifications (Sprint 12, PRD §4.3).
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct BackgroundConfig {
+    /// POST JSON `{ event, job_id, hint }` when a job enters `waiting_approval`.
+    pub webhook_url: Option<String>,
+    /// When true, try desktop notification (`notify-send` / `osascript`).
+    pub desktop_notify: Option<bool>,
+    /// Touch/write this path with job id when approval is needed (default: share dir flag file).
+    pub approval_flag_path: Option<String>,
+    /// LLM rounds per job before `completed` (each round may pause at `waiting_approval`).
+    pub max_llm_rounds: Option<u32>,
 }
 
 /// Planning / experiment loop (Sprint 10).
@@ -225,6 +240,26 @@ impl AppConfig {
                     .subagent_summary_max_chars
                     .or(self.agents.subagent_summary_max_chars),
             },
+            background: BackgroundConfig {
+                webhook_url: override_config
+                    .background
+                    .webhook_url
+                    .clone()
+                    .or_else(|| self.background.webhook_url.clone()),
+                desktop_notify: override_config
+                    .background
+                    .desktop_notify
+                    .or(self.background.desktop_notify),
+                approval_flag_path: override_config
+                    .background
+                    .approval_flag_path
+                    .clone()
+                    .or_else(|| self.background.approval_flag_path.clone()),
+                max_llm_rounds: override_config
+                    .background
+                    .max_llm_rounds
+                    .or(self.background.max_llm_rounds),
+            },
         }
     }
 }
@@ -253,6 +288,19 @@ pub fn effective_max_parallel_subagents(c: &AgentsConfig) -> usize {
 
 pub fn effective_subagent_summary_max_chars(c: &AgentsConfig) -> usize {
     c.subagent_summary_max_chars.unwrap_or(2000).max(256) as usize
+}
+
+pub fn effective_background_max_llm_rounds(c: &BackgroundConfig) -> u32 {
+    // Default 2: first round ends in `waiting_approval` so notification + resume path is exercised.
+    c.max_llm_rounds.unwrap_or(2).max(1)
+}
+
+/// Desktop notify: explicit config wins; otherwise enabled on Linux/macOS.
+pub fn effective_background_desktop_notify(c: &BackgroundConfig) -> bool {
+    if let Some(v) = c.desktop_notify {
+        return v;
+    }
+    cfg!(any(target_os = "linux", target_os = "macos"))
 }
 
 /// Whether to append provenance JSONL on successful writes.

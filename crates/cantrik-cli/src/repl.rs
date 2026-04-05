@@ -209,10 +209,9 @@ fn run_loop(
                             }
                         }
                         KeyCode::Down => {
-                            if state.hist_cursor.is_none() {
+                            let Some(idx) = state.hist_cursor else {
                                 continue;
-                            }
-                            let idx = state.hist_cursor.unwrap();
+                            };
                             if idx + 1 < state.input_history.len() {
                                 let next = idx + 1;
                                 state.input = state.input_history[next].clone();
@@ -478,19 +477,26 @@ fn handle_line(
             };
             llm::ask_stream_chunks_with(&cfg, &full_prompt, Some(&prompt), Some(usage), &mut |s| {
                 let _ = tx_chunk.send(LlmUiMsg::Chunk(s.to_string()));
-                acc2.lock().expect("acc").push_str(s);
+                // SAFETY: Mutex is only poisoned if a thread panics while holding it.
+                // This closure and the final lock below run in the same tokio task; no panic path.
+                if let Ok(mut g) = acc2.lock() {
+                    g.push_str(s);
+                }
                 Ok(())
             })
             .await
         } else {
             llm::ask_stream_chunks_with(&cfg, &full_prompt, Some(&prompt), None, &mut |s| {
                 let _ = tx_chunk.send(LlmUiMsg::Chunk(s.to_string()));
-                acc2.lock().expect("acc").push_str(s);
+                // SAFETY: same as above — single tokio task, no other panic path.
+                if let Ok(mut g) = acc2.lock() {
+                    g.push_str(s);
+                }
                 Ok(())
             })
             .await
         };
-        let body = acc.lock().expect("acc").clone();
+        let body = acc.lock().map(|g| g.clone()).unwrap_or_default();
         let _ = tx_done.send(LlmUiMsg::Done(r.map_err(|e: LlmError| e.to_string()), body));
     });
 

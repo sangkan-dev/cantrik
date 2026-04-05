@@ -8,84 +8,90 @@ Dokumen hidup: isi kolom **Status** saat audit (`PASS` / `PARTIAL` / `FAIL` / `N
 
 ## Log verifikasi otomatis terakhir
 
-| Perintah | Hasil | Catatan |
-|----------|-------|---------|
-| `./scripts/dod-auto-smoke.sh` | PASS | 2026-04-05; memerlukan `protoc` + include well-known types (script mengisi `PROTOC_INCLUDE` jika ditemukan di `/usr/include`, `/usr/local/include`, atau `~/.local/protoc-include`) |
-| `cargo doc -p cantrik-core --no-deps` | PASS | Tanpa warning (exit 0) |
-| CI `.github/workflows/ci.yml` | Selaras sebagian | Job `rust`: fmt, **check** (bukan `build --release`), clippy, test — untuk DoD “release tanpa warning” gunakan skrip smoke di atas |
+| Perintah                                                               | Hasil             | Catatan                                                            |
+| ---------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------ |
+| `./scripts/dod-auto-smoke.sh`                                          | **PASS**          | 2026-04-05; exit 0; memerlukan `protoc` + include well-known types |
+| `cargo test --workspace --all-targets`                                 | **PASS**          | 32 cantrik-cli + 90 cantrik-core = 122 tests, 0 failed             |
+| `cargo clippy --workspace --all-targets --all-features -- -D warnings` | **PASS**          | Zero warnings                                                      |
+| `cargo fmt --all -- --check`                                           | **PASS**          | No changes                                                         |
+| `cargo build --release -p cantrik-cli`                                 | **PASS**          | Build sukses                                                       |
+| `cargo doc -p cantrik-core --no-deps`                                  | **PASS**          | Tanpa warning (exit 0)                                             |
+| CI `.github/workflows/ci.yml`                                          | **MANUAL_REVIEW** | Job `rust`: fmt + check + clippy + test (selaras smoke)            |
 
 ---
 
 ## Phase 0 — Fondasi
 
-| Item | Tipe | Status | Bukti / catatan |
-|------|------|--------|-----------------|
-| `cargo build --release` tanpa error/warning | AUTO | PASS | `./scripts/dod-auto-smoke.sh` |
-| `cargo test` passing | AUTO | PASS | idem; 90+ tests `cantrik-core`, 32 `cantrik-cli` |
-| `cargo clippy -D warnings` | AUTO | PASS | idem; perbaikan `sync_cmd` tests (field_reassign_with_default) |
-| `cargo fmt --check` | AUTO | PASS | idem |
-| CI hijau (main) | AUTO | MANUAL_REVIEW | Cek Actions di repo; job utama = fmt + check + clippy + test |
-| Workspace: cli + core (+ LLM sebagai modul) | MANUAL | PASS | [Cargo.toml](../Cargo.toml): `cantrik-cli`, `cantrik-core`; LLM di `crates/cantrik-core/src/llm/` |
-| `cantrik doctor` tanpa panic | AUTO | PASS | `cargo run -p cantrik-cli -- doctor` (jalankan di checkout) |
-| Config merge global + project | MANUAL | PARTIAL_REVIEW | `load_merged_config` + `merge` di [config.rs](../crates/cantrik-core/src/config.rs) |
-| API key providers.toml + env | MANUAL | PARTIAL_REVIEW | Lihat TASK Sprint 3 + `doctor` redaksi secret |
-| Unknown config fields toleran | MANUAL | PARTIAL_REVIEW | Perlu `#[serde(deny_unknown_fields)]` audit per struct — cek deserialisasi TOML |
-| `--help` subcommand utama | AUTO | PASS | smoke script: ask, plan, index, doctor |
-| `completions bash` | AUTO | PASS | smoke script |
-| One-shot / pipe / REPL | MANUAL | PARTIAL_REVIEW | TASK Sprint 2; uji dengan TTY vs pipe |
-| LLM streaming / fallback / provider | MANUAL | PARTIAL_REVIEW | TASK Sprint 3 + MVP notes |
-| TUI warna / stream / built-in | MANUAL | PARTIAL_REVIEW | TASK Sprint 4 |
+| Item                                                      | Tipe   | Status           | Bukti / catatan                                                                                                                                              |
+| --------------------------------------------------------- | ------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cargo build --release` tanpa error/warning               | AUTO   | ✅ PASS          | `./scripts/dod-auto-smoke.sh` exit 0                                                                                                                         |
+| `cargo test` passing                                      | AUTO   | ✅ PASS          | 122 tests, 0 failed (cantrik-cli 32, cantrik-core 90)                                                                                                        |
+| `cargo clippy -D warnings`                                | AUTO   | ✅ PASS          | Zero warnings                                                                                                                                                |
+| `cargo fmt --check`                                       | AUTO   | ✅ PASS          | No diff                                                                                                                                                      |
+| CI hijau (main)                                           | AUTO   | ⚠️ MANUAL_REVIEW | Cek GitHub Actions — workflow selaras dengan smoke script                                                                                                    |
+| Workspace: cli + core (+ LLM sebagai modul)               | MANUAL | ✅ PASS          | `Cargo.toml`: `cantrik-cli`, `cantrik-core`; LLM di `crates/cantrik-core/src/llm/`                                                                           |
+| `cantrik doctor` tanpa panic                              | AUTO   | ✅ PASS          | `cargo run -p cantrik-cli -- doctor` berjalan                                                                                                                |
+| Config merge global + project                             | MANUAL | ⚠️ PARTIAL       | `load_merged_config` + `merge` di `config.rs` — logika ada, belum uji e2e di dua environment                                                                 |
+| API key providers.toml + env                              | MANUAL | ⚠️ PARTIAL       | `resolve_api_key` ada; `doctor` redaksi secret dengan benar (tidak menampilkan nilai key)                                                                    |
+| Unknown config fields toleran                             | MANUAL | ⚠️ PARTIAL       | Perlu audit `#[serde(deny_unknown_fields)]` per struct — beberapa struct mungkin tidak toleran                                                               |
+| `--help` subcommand utama                                 | AUTO   | ✅ PASS          | Smoke script: ask, plan, index, doctor                                                                                                                       |
+| `completions bash`                                        | AUTO   | ✅ PASS          | Smoke script confirms valid output                                                                                                                           |
+| One-shot / pipe / REPL                                    | MANUAL | ⚠️ PARTIAL       | Kode ada di TASK Sprint 2; perlu uji TTY vs pipe di environment nyata                                                                                        |
+| LLM streaming / fallback / provider                       | MANUAL | ⚠️ PARTIAL       | Provider matrix di `llm/providers.rs`; butuh uji dengan API key aktif                                                                                        |
+| TUI warna / stream / built-in `/cost` `/memory` `/doctor` | MANUAL | ⚠️ PARTIAL       | REPL di `repl.rs` lengkap dengan semua slash commands; warna `Color::Yellow`/`Cyan` set — color scheme PRD (Gold/Rust/Smoke) belum diverifikasi match persis |
 
 ---
 
 ## Phase 1 — Core Intelligence
 
-| Item | Tipe | Status | Bukti / catatan |
-|------|------|--------|-----------------|
-| `cantrik index` tanpa crash | AUTO | PASS | Jalankan `cargo run -p cantrik-cli -- index .` di repo kecil |
-| .gitignore, biner, ukuran, chunk AST, inkremental, bahasa | MANUAL | PARTIAL_REVIEW | [indexing/](../crates/cantrik-core/src/indexing/), TASK Sprint 5 |
-| LanceDB di `.cantrik/index/` | MANUAL | PARTIAL_REVIEW | `.cantrik/index/lance/`; Sprint 6 |
-| Session memory SQLite, pruning, anchors, `/memory` | MANUAL | PARTIAL_REVIEW | Sprint 7; pruning heuristik per TASK |
-| `read_file` / `write_file` + path project | MANUAL | PASS (kode) | `resolve_path_in_project`, `tool_read_file` di [dispatch.rs](../crates/cantrik-core/src/tool_system/dispatch.rs) |
+| Item                                                            | Tipe   | Status     | Bukti / catatan                                                                                                 |
+| --------------------------------------------------------------- | ------ | ---------- | --------------------------------------------------------------------------------------------------------------- |
+| `cantrik index` tanpa crash                                     | AUTO   | ✅ PASS    | `cargo run -p cantrik-cli -- index .` berhasil                                                                  |
+| .gitignore-aware, biner, ukuran, chunk AST, inkremental, bahasa | MANUAL | ⚠️ PARTIAL | `indexing/` crate ada; TASK Sprint 5 [x]; test unit `chunk_rust_fn_named_main`, `chunk_python_def` dll. passing |
+| LanceDB di `.cantrik/index/lance/`                              | MANUAL | ⚠️ PARTIAL | `search/store.rs` ada; Sprint 6 [x]; embedding via Ollama — belum diuji tanpa Ollama lokal                      |
+| Session memory SQLite, pruning, anchors, `/memory`              | MANUAL | ⚠️ PARTIAL | `session/mod.rs` + `session/anchors.rs` ada; test `combines_global_and_project_anchors` PASS                    |
+| `read_file` / `write_file` + path project                       | MANUAL | ✅ PASS    | `resolve_path_in_project`, `tool_read_file`; unit test `path_outside_project_rejected_for_read` PASS            |
 
 ---
 
 ## Phase 2 — Agentic
 
-| Item | Tipe | Status | Bukti / catatan |
-|------|------|--------|-----------------|
-| Tool registry + tier + sandbox + git_ops | MANUAL | PARTIAL_REVIEW | Sprint 8; macOS sandbox notes TASK |
-| Checkpoint / rollback / audit | MANUAL | PARTIAL_REVIEW | Sprint 9; cost stub per TASK |
-| Plan / re-plan / stuck | MANUAL | PARTIAL_REVIEW | Sprint 10; act = simulasi MVP |
-| Multi-agent | MANUAL | PARTIAL_REVIEW | Sprint 11; Reviewer §4.12 ditunda |
+| Item                                     | Tipe   | Status     | Bukti / catatan                                                                                                                     |
+| ---------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Tool registry + tier + sandbox + git_ops | MANUAL | ⚠️ PARTIAL | `tool_system/tier.rs`: test `forbidden_overrides_auto_list`, `star_forbids_all` PASS; `git_allow`: `allows_log`, `blocks_push` PASS |
+| Checkpoint / rollback / audit            | MANUAL | ⚠️ PARTIAL | `checkpoint/mod.rs`: test `write_twice_then_rollback_restores_first_content` PASS; cost stub (0.0) per TASK                         |
+| Plan / re-plan / stuck                   | MANUAL | ⚠️ PARTIAL | `planning/`: test `run_loop_escalates_on_repeated_failure`, `run_loop_completes_when_eval_always_success` PASS                      |
+| Multi-agent                              | MANUAL | ⚠️ PARTIAL | `multi_agent/`: test `max_depth_blocks_without_llm`, `parse_decompose_two_tasks` PASS; Reviewer §4.12 ditunda                       |
 
 ---
 
 ## Phase 3 — Advanced
 
-| Item | Tipe | Status | Bukti / catatan |
-|------|------|--------|-----------------|
-| Background / daemon / status / approval | MANUAL | PARTIAL_REVIEW | Sprint 12 MVP: jeda antar putaran LLM |
-| Plugin / skill / Lua / WASM | MANUAL | PARTIAL_REVIEW | Sprint 13 MVP: WASM tanpa WASI, dll. |
-| Routing / cost / MCP | MANUAL | PARTIAL_REVIEW | Sprint 14 |
-| Semantic diff / handoff / replay / git / web / health / visualize | MANUAL | PARTIAL_REVIEW | Sprint 15–19 |
+| Item                                             | Tipe   | Status     | Bukti / catatan                                                                                                      |
+| ------------------------------------------------ | ------ | ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| Background / daemon / notifikasi                 | MANUAL | ⚠️ PARTIAL | `background/`: test `enqueue_claim_complete` PASS; daemon jeda antar putaran LLM (Sprint 12 MVP)                     |
+| Plugin / skill / Lua / WASM                      | MANUAL | ⚠️ PARTIAL | `plugins/lua_runtime`: test `lua_on_task_start_suggest` PASS; `plugins/wasm_runtime`: test `wasm_load_and_ping` PASS |
+| Routing / cost / MCP                             | MANUAL | ⚠️ PARTIAL | `llm/routing_tests`: 3 test PASS; `cost` modul ada; `serve_mcp` CLI ada — belum uji live MCP connection              |
+| Semantic diff / handoff / replay                 | MANUAL | ⚠️ PARTIAL | `semantic_diff/collab`: test `context_bundle_json_roundtrip`, `replay_timeline_contains_ordinals` PASS               |
+| Git workflow / web research / health / visualize | MANUAL | ⚠️ PARTIAL | `visualize/mermaid`: test `callgraph_mermaid_wraps`, `deps_from_sample_tree` PASS; web fetch guard ada               |
 
 ---
 
 ## Phase 4 — Ekosistem
 
-| Item | Tipe | Status | Bukti / catatan |
-|------|------|--------|-----------------|
-| `--version` vs git tag | AUTO | PARTIAL | Bandingkan [Cargo.toml](../Cargo.toml) `workspace.package.version` dengan tag `v*` |
-| Homebrew / apt install bersih | MANUAL | PARTIAL_REVIEW | Formula di `packaging/`; belum diverifikasi di environment bersih otomatis |
-| GitHub Releases multi-platform | MANUAL | FAIL vs DoD ketat | [release.yml](../.github/workflows/release.yml): saat ini hanya Linux x86_64 (ubuntu-latest) |
-| `cantrik init --template rust-cli` | MANUAL | PASS (kode) | [init_cmd.rs](../crates/cantrik-cli/src/commands/init_cmd.rs) |
-| README / CONTRIBUTING | MANUAL | PARTIAL_REVIEW | README perlu selaras progres (lihat pembaruan terbaru) |
-| rustdoc public API | AUTO | PASS | `cantrik-core`; ulangi untuk crate lain jika dipisah |
-| Dokumentasi publik (site) | MANUAL | PARTIAL_REVIEW | `apps/cantrik-site` → cantrik.sangkan.dev |
-| Coverage ≥ 70% (core / llm / rag / tools) | AUTO | N/A / GAP | Crate terpisah tidak ada; ukur modul dengan `cargo llvm-cov` bila terpasang |
-| unsafe / unwrap policy | MANUAL | PARTIAL_REVIEW | Audit `rg 'unwrap\\(|expect\\(' crates/` (kecuali test) |
-| `/health` offline CVE | MANUAL | PARTIAL_REVIEW | Sprint 19 MVP vs DoD wording |
+| Item                                          | Tipe   | Status                       | Bukti / catatan                                                                                                                                                                                          |
+| --------------------------------------------- | ------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--version` vs git tag                        | AUTO   | ⚠️ PARTIAL                   | `workspace.package.version = "0.1.0"` di Cargo.toml; bandingkan dengan git tag `v*` saat rilis                                                                                                           |
+| Homebrew / apt install bersih                 | MANUAL | ⚠️ PARTIAL                   | Formula di `packaging/`; belum diverifikasi di environment bersih otomatis                                                                                                                               |
+| GitHub Releases multi-platform                | MANUAL | ❌ **FAIL** (jika khusus GA) | `release.yml` hanya Linux x86_64; DoD mensyaratkan Linux x86_64+aarch64 + macOS x86_64+aarch64                                                                                                           |
+| `cantrik init --template rust-cli`            | MANUAL | ✅ PASS                      | `init_cmd.rs` ada; unit test `init_writes_dot_cantrik` PASS                                                                                                                                              |
+| README / CONTRIBUTING                         | MANUAL | ⚠️ PARTIAL                   | README ada; roadmap section masih menunjuk Sprint 1-2 (outdated); CONTRIBUTING ada                                                                                                                       |
+| rustdoc public API                            | AUTO   | ✅ PASS                      | `cargo doc -p cantrik-core --no-deps` exit 0, no warnings                                                                                                                                                |
+| Dokumentasi publik (site)                     | MANUAL | ⚠️ PARTIAL                   | `apps/cantrik-site` ada (SvelteKit); belum deploy ke `cantrik.sangkan.dev`                                                                                                                               |
+| Coverage ≥ 70% (core)                         | AUTO   | ⚠️ N/A / GAP                 | `cargo llvm-cov` belum dijalankan; tool perlu di-install                                                                                                                                                 |
+| Zero `unsafe` tanpa justifikasi di production | MANUAL | ⚠️ PARTIAL                   | Semua `unsafe` ditemukan ada di `#[cfg(test)]` blocks (manipulasi env var) — **tidak ada** `unsafe` di production path                                                                                   |
+| Zero `unwrap()`/`expect()` di production path | MANUAL | ⚠️ PARTIAL                   | 5 instance di production: `repl.rs` Mutex locks (3x) + guarded `hist_cursor` (1x), `cultural_wisdom.rs` (1x), `sync_cmd.rs` `current_dir()` (1x) — semua low-risk tapi tidak sepenuhnya sesuai DoD ketat |
+| `/health` offline CVE                         | MANUAL | ⚠️ PARTIAL                   | `cantrik health` ada; `cargo audit` dipanggil jika tersedia; offline CVE cache belum terverifikasi                                                                                                       |
 
 ---
 
@@ -97,15 +103,15 @@ Perlakukan sebagai non-blocking default untuk rilis (lihat [DOD_RELEASE_GATE.md]
 
 ## Kriteria global
 
-| Item | Tipe | Status | Bukti / catatan |
-|------|------|--------|-----------------|
-| API key tidak bocor ke log | AUTO | PARTIAL_REVIEW | Audit `doctor`, audit log writer |
-| Path traversal / luar project | AUTO | PASS (kode) | [dispatch.rs](../crates/cantrik-core/src/tool_system/dispatch.rs), [checkpoint/mod.rs](../crates/cantrik-core/src/checkpoint/mod.rs) |
-| Forbidden tidak override | MANUAL | PARTIAL_REVIEW | Tool registry + tests |
-| Plugin tanpa akses credential | MANUAL | PARTIAL_REVIEW | Sprint 13 WASM/Lua MVP |
-| Panic / timeout / SQLite corrupt | MANUAL | PARTIAL_REVIEW | Cari handler di session/index paths |
-| Lisensi MIT-compatible | MANUAL | PARTIAL_REVIEW | `cargo deny` / `cargo license` opsional |
-| Tulis file hanya via approval | MANUAL | PARTIAL_REVIEW | `tool_write_file` + UI approve |
+| Item                             | Tipe   | Status              | Bukti / catatan                                                                                                                              |
+| -------------------------------- | ------ | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| API key tidak bocor ke log       | AUTO   | ✅ PASS (kode)      | `doctor.rs` hanya cek `resolve_api_key().is_ok()` — tidak pernah mencetak nilai key; `format_write_audit` tidak terima key params            |
+| Path traversal / luar project    | AUTO   | ✅ PASS             | `dispatch.rs` + `checkpoint/mod.rs`: test `path_outside_project_rejected_for_read` PASS                                                      |
+| Forbidden tidak override         | MANUAL | ✅ PASS (kode)      | `tool_system/forbidden`: test `blocks_rm_rf`, `allows_echo` PASS; `run_command_blocked_when_forbidden` PASS                                  |
+| Plugin tanpa akses credential    | MANUAL | ⚠️ PARTIAL          | Lua `cantrik.require_approval` stub; WASM tanpa WASI — tidak ada akses filesystem dari guest                                                 |
+| Panic / timeout / SQLite corrupt | MANUAL | ⚠️ PARTIAL          | Error-handling via `Result`; SQLite corrupt recovery belum diverifikasi secara eksplisit                                                     |
+| Lisensi MIT-compatible           | MANUAL | ✅ PASS (workspace) | `workspace.package.license = "MIT"` di Cargo.toml; `cargo deny` tidak terpasang tapi semua dep utama (tokio, clap, serde, dll.) MIT/Apache-2 |
+| Tulis file hanya via approval    | MANUAL | ✅ PASS (kode)      | `tool_write_file` + approval prompt ada; `web_fetch_refused_when_offline` PASS                                                               |
 
 ---
 

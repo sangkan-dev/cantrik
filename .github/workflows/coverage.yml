@@ -1,0 +1,41 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run coverage
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+
+      - name: Print coverage summary
+        run: cargo llvm-cov --workspace --summary-only
+
+      - name: Upload coverage to Codecov (optional)
+        if: github.event_name == 'push'
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

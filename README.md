@@ -3,6 +3,7 @@
 > **Cantrik** (ꦕꦤ꧀ꦠꦿꦶꦏ꧀) — Open-Source AI CLI Agent berbasis Rust
 
 Cantrik adalah CLI agent yang memahami struktur codebase Anda secara semantik, menggunakan LLM multi-provider dengan kemampuan:
+
 - **Semantic search** berbasis AST dan embeddings lokal
 - **Session memory** yang smart dengan context compression
 - **Multi-provider LLM** (Anthropic, Google Gemini, Ollama)
@@ -44,13 +45,14 @@ cantrik init --template rust-cli
 ./scripts/dod-auto-smoke.sh
 ```
 
-Build LanceDB membutuhkan `protoc` dan *well-known* protobuf includes (skrip mengisi `PROTOC_INCLUDE` jika ditemukan; di CI Ubuntu paket `protobuf-compiler`).
+Build LanceDB membutuhkan `protoc` dan _well-known_ protobuf includes (skrip mengisi `PROTOC_INCLUDE` jika ditemukan; di CI Ubuntu paket `protobuf-compiler`).
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
+
 - **Rust 1.70+** (install via [rustup](https://rustup.rs/))
 - **Git**
 
@@ -122,6 +124,7 @@ cantrik/
 ### Multi-Crate Design
 
 **`cantrik-core`** (Library)
+
 - Configuration system (2-tier precedence: `~/.config/cantrik` vs `.cantrik/`)
 - LLM provider abstraction (trait-based for future providers)
 - Indexing & semantic search engine
@@ -129,6 +132,7 @@ cantrik/
 - Tool definitions registry
 
 **`cantrik-cli`** (Binary)
+
 - Command-line interface (clap-based)
 - Subcommands: `ask`, `plan`, `index`, `doctor`, `health`
 - REPL integration
@@ -141,6 +145,7 @@ cantrik/
 3. **Defaults** (lowest priority): built-in
 
 Example config:
+
 ```toml
 [ui]
 theme = "dark"
@@ -178,6 +183,7 @@ Set `[ui] tui_split_pane = true` in `cantrik.toml` to show assistant + **preview
 ### Pre-Commit Quality Gates
 
 We use automated checks before committing:
+
 ```bash
 # Installed in .githooks/pre-commit
 # Automatically runs:
@@ -208,12 +214,13 @@ cargo test lib_name                # Single test
 ### Feature Flags
 
 Currently, `reqwest` is configured with:
+
 - `json` — JSON serialization support
 - `rustls` — TLS via rustls (not OpenSSL)
 
 ```toml
 # In Cargo.toml (workspace deps)
-reqwest = { version = "0.13.2", default-features = false, 
+reqwest = { version = "0.13.2", default-features = false,
             features = ["json", "rustls"] }
 ```
 
@@ -221,30 +228,54 @@ reqwest = { version = "0.13.2", default-features = false,
 
 ## Roadmap
 
-### Phase 0-1: Foundation (Sprints 1-2)
-- [x] **Sprint 1:** Workspace setup, dependencies, config system, tooling
-- [ ] **Sprint 2:** CLI scaffold (ask, plan, index, doctor subcommands)
+### Phase 0 — Foundation ✅ (Sprints 1–4)
 
-### Phase 2: Core LLM Integration (Sprints 3-4)
-- [ ] **Sprint 3:** Multi-provider LLM bridge (Anthropic, Gemini, Ollama)
-- [ ] **Sprint 4:** Interactive REPL + thinking log streaming
+- [x] **Sprint 1:** Workspace, CI, config system
+- [x] **Sprint 2:** CLI scaffold (`ask`, `plan`, `index`, `doctor`, completions, one-shot/pipe/REPL)
+- [x] **Sprint 3:** Multi-provider LLM bridge (Anthropic, Gemini, Ollama + OpenAI/Azure/OpenRouter/Groq), streaming, fallback
+- [x] **Sprint 4:** Interactive REPL + `ratatui` TUI, thinking log, `/cost` `/memory` `/doctor`
 
-### Phase 3: Codebase Intelligence (Sprints 5-6)
-- [ ] **Sprint 5:** AST indexing via tree-sitter, incremental updates
-- [ ] **Sprint 6:** Vector embeddings + semantic search (LanceDB)
+### Phase 1 — Core Intelligence ✅ (Sprints 5–7)
 
-### Phase 4: Memory & Context (Sprint 7)
-- [ ] **Sprint 7:** Session memory, context compression, memory anchors
+- [x] **Sprint 5:** AST indexing via `tree-sitter` (10+ languages), incremental updates, dependency graph
+- [x] **Sprint 6:** Vector store (LanceDB), semantic search, Ollama local embeddings
+- [x] **Sprint 7:** Session memory (SQLite), context pruning, anchors, `read_file`/`write_file` + diff preview
 
-**Timeline:** ~4 months (7 x 2-week sprints)
+### Phase 2 — Agentic ✅ (Sprints 8–11)
 
-See [TASK.md](./TASK.md) for detailed sprint breakdown and acceptance criteria.
+- [x] **Sprint 8:** Tool registry, sandbox (bubblewrap), permission tiers, `git_ops`
+- [x] **Sprint 9:** Checkpoint/rollback, append-only audit log, provenance
+- [x] **Sprint 10:** Planning, re-planning, stuck detection & escalation
+- [x] **Sprint 11:** Multi-agent orchestration (parallel sub-agents, depth limit, isolation)
+
+### Phase 3 — Advanced Features ✅ (Sprints 12–18)
+
+- [x] **Sprint 12:** Background daemon, `cantrik status`, desktop notifications
+- [x] **Sprint 13:** Plugin system (Lua + WASM), skills, rules, macros
+- [x] **Sprint 14:** Smart routing, cost budgets, MCP server + client
+- [x] **Sprint 15:** Semantic diff, handoff, replay, context export/import
+- [x] **Sprint 16:** Git-native workflow, `cantrik review`, web research
+- [x] **Sprint 17:** Code archaeology, `cantrik teach`, dependency intelligence, `cantrik audit`
+- [x] **Sprint 18:** LSP, voice input, `/visualize` Mermaid, TUI split-pane, cultural wisdom mode
+
+### Phase 4 — Ecosystem ✅ (Sprint 19)
+
+- [x] **Sprint 19:** SvelteKit hub, `cantrik init` templates, GitHub Releases binary, VS Code extension, Tauri tray, health scanner, adaptive Begawan
+
+### Remaining (GA gate)
+
+- [ ] Multi-platform release binaries (Linux aarch64 + macOS — CI workflow updated)
+- [ ] Test coverage ≥ 70% (`cargo llvm-cov`)
+- [ ] Deploy `apps/cantrik-site` → `cantrik.sangkan.dev`
+
+See [TASK.md](./TASK.md) for the full sprint board and [DEFINITION_OF_DONE.md](./DEFINITION_OF_DONE.md) for release criteria.
 
 ---
 
 ## Contributing
 
 ### Code Standards
+
 - **Language:** Rust 2024 edition
 - **Formatting:** `rustfmt` (automatic via CI)
 - **Linting:** `clippy` with `-D warnings` (zero warnings policy)
@@ -254,6 +285,7 @@ See [TASK.md](./TASK.md) for detailed sprint breakdown and acceptance criteria.
 ### Commit Workflow
 
 1. **Create branch** from current sprint:
+
    ```bash
    git checkout -b sprint-N/feature-name
    ```
@@ -261,6 +293,7 @@ See [TASK.md](./TASK.md) for detailed sprint breakdown and acceptance criteria.
 2. **Make changes** following [Rust engineering rules](./github/instructions/rust-cantrik.instructions.md)
 
 3. **Pre-commit check** (auto-runs):
+
    ```bash
    .githooks/pre-commit
    ```
@@ -271,6 +304,7 @@ See [TASK.md](./TASK.md) for detailed sprint breakdown and acceptance criteria.
    - CI must pass (GitHub Actions)
 
 ### PR Checklist
+
 - [ ] Code passes `cargo fmt --check`
 - [ ] Code passes `cargo clippy -- -D warnings`
 - [ ] Tests added/updated for new logic
@@ -303,10 +337,12 @@ cantrik ask "what does this codebase do?"
 ### Build Errors
 
 **"cannot find type `Config` in module `config`"**
+
 - Ensure `src/config.rs` exports public types
 - Check: `pub struct AppConfig { ... }`
 
 **"feature `rustls-tls` is not valid"**
+
 - Use `rustls` feature (not `rustls-tls`)
 - See [Cargo.toml](./Cargo.toml) for correct configuration
 
@@ -339,6 +375,7 @@ MIT License — See LICENSE file for details
 ## Acknowledgments
 
 Cantrik is built with:
+
 - [Rust Language](https://www.rust-lang.org/)
 - [Tokio](https://tokio.rs/) — Async runtime
 - [Clap](https://docs.rs/clap/) — CLI argument parsing
@@ -347,5 +384,5 @@ Cantrik is built with:
 
 ---
 
-**Last Updated:** Sprint 1 Complete (2026-04)  
-**Next Milestone:** Sprint 2 — CLI Scaffold & Command Surface v1
+**Last Updated:** Sprint 1–19 Complete (2026-04)  
+**Next Milestone:** GA — multi-platform binaries, coverage ≥70%, docs site deploy

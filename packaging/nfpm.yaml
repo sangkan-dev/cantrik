@@ -1,0 +1,19 @@
+# nfpm (https://nfpm.goreleaser.com/) — build a .deb after release binary exists:
+#   cargo build --release -p cantrik
+#   VERSION=0.1.0 nfpm pkg --config packaging/nfpm.yaml --packager deb
+# Adjust `arch` (amd64, arm64) to match the built binary.
+name: cantrik
+arch: amd64
+platform: linux
+version: 0.1.0
+section: utils
+priority: optional
+maintainer: "Sangkan <https://github.com/sangkan-dev>"
+description: "Cantrik — open-source AI CLI agent (Rust)."
+homepage: "https://github.com/sangkan-dev/cantrik"
+license: MIT
+contents:
+  - src: ../target/release/cantrik
+    dst: /usr/bin/cantrik
+    file_info:
+      mode: 0755

@@ -18,12 +18,12 @@ use sqlx::SqlitePool;
 use thiserror::Error;
 
 pub use providers::{
-    ProviderKind, ProviderTarget, ProvidersToml, azure_chat_completions_url, build_attempt_chain,
-    groq_api_base, load_providers_toml, ollama_base_url, openai_api_base, openrouter_api_base,
-    providers_toml_path, resolve_api_key,
+    ProviderKind, ProviderTarget, ProvidersToml, apply_offline_policy, azure_chat_completions_url,
+    build_attempt_chain, groq_api_base, load_providers_toml, ollama_base_is_loopback,
+    ollama_base_url, openai_api_base, openrouter_api_base, providers_toml_path, resolve_api_key,
 };
 
-use crate::config::AppConfig;
+use crate::config::{AppConfig, effective_llm_offline};
 use providers::ProvidersLoadError;
 
 #[derive(Debug, Error)]
@@ -150,6 +150,9 @@ pub async fn ask_stream_chunks_with(
         build_attempt_chain(app.llm.provider.as_deref(), app.llm.model.as_deref(), &prov)?;
     if let Some(rp) = routing_prompt {
         apply_auto_route(&mut chain, &prov, rp).map_err(LlmError::Providers)?;
+    }
+    if effective_llm_offline(&app.llm) {
+        chain = apply_offline_policy(chain, &prov)?;
     }
 
     let client = http_client()?;

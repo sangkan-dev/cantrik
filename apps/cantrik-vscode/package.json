@@ -1,0 +1,51 @@
+{
+  "name": "cantrik",
+  "displayName": "Cantrik",
+  "description": "Run Cantrik CLI from the editor when cantrik is on PATH; optional LSP stdio.",
+  "version": "0.1.0",
+  "publisher": "sangkan",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cantrik.doctor",
+        "title": "Cantrik: Doctor"
+      },
+      {
+        "command": "cantrik.health",
+        "title": "Cantrik: Health (audit only)"
+      },
+      {
+        "command": "cantrik.version",
+        "title": "Cantrik: Version"
+      },
+      {
+        "command": "cantrik.startLsp",
+        "title": "Cantrik: Start LSP (stdio)"
+      },
+      {
+        "command": "cantrik.stopLsp",
+        "title": "Cantrik: Stop LSP"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  }
+}

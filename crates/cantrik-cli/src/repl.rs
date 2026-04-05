@@ -24,6 +24,7 @@ use tokio::runtime::Handle;
 
 use crate::commands::agents_cmd;
 use crate::commands::doctor;
+use crate::commands::health;
 use crate::commands::plan as plan_cmd;
 
 const MAX_THINKING_LINES: usize = 48;
@@ -34,6 +35,8 @@ enum SlashCmd {
     Cost,
     Memory,
     Doctor,
+    /// Audit only; full gate: `cantrik health`.
+    Health,
     Plan(Option<String>),
     Agents(Option<String>),
     /// Optional tail: callgraph | architecture | dependencies
@@ -248,7 +251,7 @@ fn handle_line(
             SlashCmd::Exit => return Ok(true),
             SlashCmd::Help => {
                 state.push_thinking(
-                    "/cost · /memory · /plan · /agents · /visualize [callgraph|architecture|dependencies] · /doctor · /exit",
+                    "/cost · /memory · /plan · /agents · /visualize [callgraph|architecture|dependencies] · /doctor · /health · /exit",
                 );
             }
             SlashCmd::Visualize(tail) => {
@@ -333,6 +336,21 @@ fn handle_line(
             SlashCmd::Doctor => {
                 state.push_thinking("—— doctor ——".to_string());
                 for l in doctor::report_lines(cwd) {
+                    state.push_thinking(l);
+                }
+            }
+            SlashCmd::Health => {
+                state.push_thinking(
+                    "—— health (audit only; use `cantrik health` for clippy + test) ——".to_string(),
+                );
+                let cli = health::HealthCli {
+                    soft: true,
+                    no_clippy: true,
+                    no_test: true,
+                    timeout_sec: 180,
+                };
+                let rep = rt.block_on(health::run_report(cwd, config, &cli));
+                for l in rep.lines {
                     state.push_thinking(l);
                 }
             }
@@ -502,6 +520,7 @@ fn parse_slash(line: &str) -> Option<SlashCmd> {
         "cost" => SlashCmd::Cost,
         "memory" => SlashCmd::Memory,
         "doctor" => SlashCmd::Doctor,
+        "health" => SlashCmd::Health,
         "plan" => SlashCmd::Plan(if tail.is_empty() {
             None
         } else {
@@ -606,6 +625,7 @@ mod tests {
         assert!(matches!(parse_slash("/cost"), Some(SlashCmd::Cost)));
         assert!(matches!(parse_slash("/memory"), Some(SlashCmd::Memory)));
         assert!(matches!(parse_slash("/doctor"), Some(SlashCmd::Doctor)));
+        assert!(matches!(parse_slash("/health"), Some(SlashCmd::Health)));
         assert!(matches!(parse_slash("/exit"), Some(SlashCmd::Exit)));
         assert!(matches!(parse_slash("/help"), Some(SlashCmd::Help)));
         assert!(matches!(

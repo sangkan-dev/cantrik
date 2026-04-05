@@ -1,4 +1,5 @@
 pub(crate) mod agents_cmd;
+pub(crate) mod approval_record;
 pub(crate) mod ask;
 pub(crate) mod background_cmd;
 pub(crate) mod collab_cmd;
@@ -13,6 +14,7 @@ pub(crate) mod fetch_cmd;
 pub(crate) mod file_cmd;
 pub(crate) mod fix_cmd;
 pub(crate) mod git_cmd;
+pub(crate) mod health;
 pub(crate) mod index;
 pub(crate) mod init_cmd;
 pub(crate) mod intelligence_cmd;

@@ -6,6 +6,8 @@ use cantrik_core::config::AppConfig;
 use cantrik_core::tool_system::{tool_read_file, tool_write_file};
 use cantrik_core::tools::{WriteApproval, diff_for_new_contents};
 
+use super::approval_record;
+
 const STDIN_MAX: u64 = 4 * 1024 * 1024;
 
 fn max_read_bytes(config: &AppConfig) -> u64 {
@@ -47,7 +49,7 @@ fn read_new_content(content_file: Option<&Path>, max_bytes: u64) -> Result<Strin
     }
 }
 
-pub(crate) fn write_run(
+pub(crate) async fn write_run(
     config: &AppConfig,
     project_root: &Path,
     path: &Path,
@@ -90,6 +92,9 @@ pub(crate) fn write_run(
     ) {
         Ok(()) => {
             eprintln!("file write: wrote {}", path.display());
+            let sum = format!("{}", path.display());
+            approval_record::record_if_adaptive(project_root, config, "write_file", true, &sum)
+                .await;
             ExitCode::SUCCESS
         }
         Err(e) => {

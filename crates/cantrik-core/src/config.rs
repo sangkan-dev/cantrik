@@ -124,6 +124,8 @@ pub struct UiConfig {
 pub struct LlmConfig {
     pub provider: Option<String>,
     pub model: Option<String>,
+    /// When true (or `CANTRIK_OFFLINE=1`), only local Ollama on a loopback base URL is used (Sprint 19).
+    pub offline: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
@@ -220,6 +222,10 @@ pub struct MemoryConfig {
     pub max_file_read_bytes: Option<u64>,
     /// Verbatim tail message count preserved when summarizing.
     pub context_tail_messages: Option<u32>,
+    /// When true, record explicit CLI approvals and inject a short summary into session prompts (Sprint 19, PRD §4.15).
+    pub adaptive_begawan: Option<bool>,
+    /// Max characters for the adaptive memory block in prompts (default 900).
+    pub adaptive_begawan_max_chars: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -262,6 +268,7 @@ impl AppConfig {
             llm: LlmConfig {
                 provider: override_config.llm.provider.or(self.llm.provider),
                 model: override_config.llm.model.or(self.llm.model),
+                offline: override_config.llm.offline.or(self.llm.offline),
             },
             index: IndexConfig {
                 vector_model: override_config
@@ -287,6 +294,14 @@ impl AppConfig {
                     .memory
                     .context_tail_messages
                     .or(self.memory.context_tail_messages),
+                adaptive_begawan: override_config
+                    .memory
+                    .adaptive_begawan
+                    .or(self.memory.adaptive_begawan),
+                adaptive_begawan_max_chars: override_config
+                    .memory
+                    .adaptive_begawan_max_chars
+                    .or(self.memory.adaptive_begawan_max_chars),
             },
             sandbox: SandboxConfig {
                 level: override_config.sandbox.level.or(self.sandbox.level),
@@ -539,6 +554,26 @@ pub fn effective_audit_command(c: &IntelligenceConfig) -> Vec<String> {
         .clone()
         .filter(|v| !v.is_empty())
         .unwrap_or_else(|| vec!["cargo".into(), "audit".into()])
+}
+
+/// Adaptive Begawan: off unless `[memory].adaptive_begawan = true`.
+pub fn effective_adaptive_begawan(c: &MemoryConfig) -> bool {
+    c.adaptive_begawan.unwrap_or(false)
+}
+
+pub fn effective_adaptive_begawan_max_chars(c: &MemoryConfig) -> usize {
+    c.adaptive_begawan_max_chars.unwrap_or(900).max(200) as usize
+}
+
+/// Air-gapped / offline LLM: enabled when `[llm].offline = true` or `CANTRIK_OFFLINE` is `1`/`true`/`yes`.
+pub fn effective_llm_offline(c: &LlmConfig) -> bool {
+    if let Ok(v) = env::var("CANTRIK_OFFLINE") {
+        let s = v.trim().to_ascii_lowercase();
+        if matches!(s.as_str(), "1" | "true" | "yes" | "on") {
+            return true;
+        }
+    }
+    c.offline.unwrap_or(false)
 }
 
 /// Canonical, sorted, deduplicated extra roots from config (excludes the primary cwd).

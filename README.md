@@ -21,6 +21,7 @@ cantrik
 
 - **Website (placeholder docs + plugin registry MVP):** [apps/cantrik-site](apps/cantrik-site/) — deploy to **`https://cantrik.sangkan.dev`**. PRD also mentions `cantrik.dev` as a possible alias/redirect.
 - **Pre-built CLI:** Linux x86_64 binary attached to [GitHub Releases](https://github.com/sangkan-dev/cantrik/releases) when you push a version tag `v*` (see `.github/workflows/release.yml`).
+- **Packaging (Sprint 19):** [Homebrew formula](packaging/homebrew/cantrik.rb) (build-from-source via `--HEAD` until a stable tap block is added) and [nfpm config](packaging/nfpm.yaml) for `.deb` after `cargo build --release -p cantrik`.
 
 ### Bootstrap `.cantrik/` in a repo
 
@@ -130,7 +131,7 @@ cantrik/
 
 **`cantrik-cli`** (Binary)
 - Command-line interface (clap-based)
-- Subcommands: `ask`, `plan`, `index`, `doctor`
+- Subcommands: `ask`, `plan`, `index`, `doctor`, `health`
 - REPL integration
 - Config resolution & startup
 
@@ -149,6 +150,19 @@ theme = "dark"
 provider = "anthropic"
 model = "claude-3-sonnet"
 ```
+
+### Air-gapped / offline LLM (enterprise)
+
+Set `[llm] offline = true` in `cantrik.toml` **or** export `CANTRIK_OFFLINE=1` (also `true` / `yes` / `on`). In that mode Cantrik only uses **Ollama** targets from your provider chain and requires `providers.toml` → `[providers.ollama] base_url` to use a **loopback** host (`127.0.0.1`, `localhost`, or `::1`). Cloud providers in `fallback_chain` are skipped. Other features (web search/fetch, MCP, remote embeddings) may still use the network unless configured otherwise—treat offline mode as an LLM routing guarantee, not a full sandbox.
+
+### Adaptive Begawan (approval memory, PRD §4.15)
+
+Set `[memory] adaptive_begawan = true` to record summaries when you use `--approve` on `cantrik file write`, `cantrik exec`, and `cantrik experiment`, and to inject a short “recent decisions” block into session LLM prompts. Cap size with optional `[memory] adaptive_begawan_max_chars` (default 900).
+
+### Editor and desktop (Sprint 19)
+
+- **VS Code:** [`apps/cantrik-vscode`](apps/cantrik-vscode/) — `npm install && npm run compile`, then “Install from VSIX…” or open folder in VS Code for development; requires `cantrik` on `PATH`.
+- **Companion:** [`apps/cantrik-tray`](apps/cantrik-tray/) — `cargo run` polls `~/.local/share/cantrik/approval-pending.flag` and sends a desktop notification when it appears (same default path as background jobs). A future Tauri build can host the same logic in a tray UI.
 
 ---
 

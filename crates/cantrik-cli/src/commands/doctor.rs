@@ -64,6 +64,13 @@ pub(crate) fn report_lines(cwd: &Path) -> Vec<String> {
             if let Some(m) = config.llm.model.as_deref() {
                 lines.push(format!("  llm.model    : {m}"));
             }
+            if cantrik_core::config::effective_llm_offline(&config.llm) {
+                lines.push("  llm.offline (effective): true (Ollama loopback only)".to_string());
+            }
+            if cantrik_core::config::effective_adaptive_begawan(&config.memory) {
+                lines
+                    .push("  memory.adaptive_begawan: on (approval memory in prompts)".to_string());
+            }
             if let Some(m) = config.index.vector_model.as_deref() {
                 lines.push(format!("  index.vector_model: {m}"));
             }

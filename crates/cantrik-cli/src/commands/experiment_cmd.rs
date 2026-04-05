@@ -11,6 +11,7 @@ use cantrik_core::planning::parse_experiment_writes;
 use cantrik_core::tool_system::{ExecApproval, tool_run_command, tool_write_file};
 use cantrik_core::tools::WriteApproval;
 
+use super::approval_record;
 use super::session_llm;
 
 pub(crate) async fn run(config: &AppConfig, cwd: &Path, goal: &str, approve: bool) -> ExitCode {
@@ -72,6 +73,7 @@ Goal:\n{}",
             }
             return ExitCode::FAILURE;
         }
+        approval_record::record_if_adaptive(cwd, config, "write_file", true, &w.path).await;
     }
 
     if parsed.writes.is_empty() {
@@ -111,6 +113,8 @@ Goal:\n{}",
     let _ = std::io::stderr().write_all(&test_out.stderr);
 
     let ok = test_out.status.success();
+    let sum = format!("experiment test: {program} {:?}", args);
+    approval_record::record_if_adaptive(cwd, config, "run_command", ok, &sum).await;
     if !ok {
         eprintln!("experiment: test command failed; reverting...");
         if let Err(r) = revert_checkpoints_after_seq(cwd, start_seq) {

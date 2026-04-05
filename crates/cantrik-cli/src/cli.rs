@@ -318,6 +318,21 @@ pub enum Command {
     },
     /// Check Cantrik installation, config, and connectivity (expanded over sprints).
     Doctor,
+    /// Local dev gate: `cargo audit` (or `[intelligence].audit_command`), optional clippy and `cargo test --workspace --lib`, each with a timeout (Sprint 19, PRD §4.14).
+    Health {
+        /// Always exit 0 (still print failures).
+        #[arg(long)]
+        soft: bool,
+        /// Skip `cargo clippy --workspace -- -D warnings`.
+        #[arg(long)]
+        no_clippy: bool,
+        /// Skip `cargo test --workspace --lib`.
+        #[arg(long)]
+        no_test: bool,
+        /// Timeout in seconds for each spawned check (default 300).
+        #[arg(long, default_value_t = 300)]
+        timeout_sec: u64,
+    },
     /// Print shell completions to stdout (write to a file or source from your shell).
     Completions {
         /// Target shell.

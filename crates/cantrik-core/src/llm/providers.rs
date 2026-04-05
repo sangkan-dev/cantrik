@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use thiserror::Error;
+use url::Url;
 
 /// Well-known provider ids in config (case-insensitive when parsing routes).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -221,6 +222,14 @@ pub enum ProvidersLoadError {
         "no LLM targets: set [llm] in cantrik.toml and/or [routing].fallback_chain in providers.toml"
     )]
     NoTargets,
+    #[error(
+        "offline/air-gapped mode: Ollama base_url must use a loopback host (127.0.0.1, localhost, or ::1); got {0}"
+    )]
+    OfflineOllamaNotLoopback(String),
+    #[error(
+        "offline/air-gapped mode: provider chain has no Ollama targets (cloud providers are disabled)"
+    )]
+    OfflineNoOllamaTargets,
 }
 
 /// Path to global providers file: `~/.config/cantrik/providers.toml`.
@@ -482,6 +491,46 @@ pub fn ollama_base_url(providers: &ProvidersToml) -> String {
         .unwrap_or_else(|| default_ollama_base().trim_end_matches('/').to_string())
 }
 
+/// True when the Ollama HTTP base is clearly local-only (loopback), for air-gapped enforcement.
+pub fn ollama_base_is_loopback(base: &str) -> bool {
+    let raw = base.trim();
+    if raw.is_empty() {
+        return false;
+    }
+    let with_scheme = if raw.contains("://") {
+        raw.to_string()
+    } else {
+        format!("http://{raw}")
+    };
+    let Ok(u) = Url::parse(&with_scheme) else {
+        return false;
+    };
+    let Some(host) = u.host_str() else {
+        return false;
+    };
+    let h = host.to_ascii_lowercase();
+    h == "localhost" || h == "127.0.0.1" || h == "::1" || h == "[::1]" || h.starts_with("127.")
+}
+
+/// Keep only Ollama targets and require a loopback `providers.ollama.base_url`.
+pub fn apply_offline_policy(
+    chain: Vec<ProviderTarget>,
+    providers: &ProvidersToml,
+) -> Result<Vec<ProviderTarget>, ProvidersLoadError> {
+    let base = ollama_base_url(providers);
+    if !ollama_base_is_loopback(&base) {
+        return Err(ProvidersLoadError::OfflineOllamaNotLoopback(base));
+    }
+    let filtered: Vec<ProviderTarget> = chain
+        .into_iter()
+        .filter(|t| t.kind == ProviderKind::Ollama)
+        .collect();
+    if filtered.is_empty() {
+        return Err(ProvidersLoadError::OfflineNoOllamaTargets);
+    }
+    Ok(filtered)
+}
+
 /// Parse `provider/model` or `provider` (model optional).
 pub fn parse_route_entry(
     entry: &str,
@@ -665,6 +714,95 @@ mod tests {
                 model: "llama3.2".into()
             }]
         );
+    }
+
+    #[test]
+    fn ollama_loopback_detection() {
+        assert!(ollama_base_is_loopback("http://127.0.0.1:11434"));
+        assert!(ollama_base_is_loopback("http://localhost:11434"));
+        assert!(ollama_base_is_loopback("http://[::1]:11434"));
+        assert!(!ollama_base_is_loopback("http://192.168.1.5:11434"));
+        assert!(!ollama_base_is_loopback("https://ollama.example.com"));
+    }
+
+    #[test]
+    fn offline_policy_filters_cloud_and_requires_loopback() {
+        let prov_bad = ProvidersToml {
+            providers: ProviderSections {
+                ollama: Some(OllamaSection {
+                    base_url: "http://10.0.0.1:11434".into(),
+                    default_model: Some("m".into()),
+                    _embed_model: None,
+                }),
+                ..Default::default()
+            },
+            routing: Some(RoutingSection {
+                fallback_chain: vec!["ollama".into()],
+                ..Default::default()
+            }),
+            mcp_client: None,
+        };
+        let chain = build_attempt_chain(None, None, &prov_bad).expect("chain");
+        let err = apply_offline_policy(chain, &prov_bad).expect_err("non-loopback");
+        assert!(matches!(
+            err,
+            ProvidersLoadError::OfflineOllamaNotLoopback(_)
+        ));
+
+        let prov_ok = ProvidersToml {
+            providers: ProviderSections {
+                anthropic: Some(AnthropicSection {
+                    api_key: None,
+                    default_model: Some("claude".into()),
+                }),
+                ollama: Some(OllamaSection {
+                    base_url: "http://127.0.0.1:11434".into(),
+                    default_model: Some("m".into()),
+                    _embed_model: None,
+                }),
+                ..Default::default()
+            },
+            routing: Some(RoutingSection {
+                fallback_chain: vec!["anthropic/claude".into(), "ollama".into()],
+                ..Default::default()
+            }),
+            mcp_client: None,
+        };
+        let chain = build_attempt_chain(None, None, &prov_ok).expect("chain");
+        let filtered = apply_offline_policy(chain, &prov_ok).expect("ok");
+        assert_eq!(
+            filtered,
+            vec![ProviderTarget {
+                kind: ProviderKind::Ollama,
+                model: "m".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn offline_policy_errors_when_no_ollama_in_chain() {
+        let prov = ProvidersToml {
+            providers: ProviderSections {
+                ollama: Some(OllamaSection {
+                    base_url: "http://127.0.0.1:11434".into(),
+                    default_model: Some("m".into()),
+                    _embed_model: None,
+                }),
+                anthropic: Some(AnthropicSection {
+                    api_key: None,
+                    default_model: Some("c".into()),
+                }),
+                ..Default::default()
+            },
+            routing: Some(RoutingSection {
+                fallback_chain: vec!["anthropic".into()],
+                ..Default::default()
+            }),
+            mcp_client: None,
+        };
+        let chain = build_attempt_chain(None, None, &prov).expect("chain");
+        let err = apply_offline_policy(chain, &prov).expect_err("no ollama");
+        assert!(matches!(err, ProvidersLoadError::OfflineNoOllamaTargets));
     }
 
     #[test]

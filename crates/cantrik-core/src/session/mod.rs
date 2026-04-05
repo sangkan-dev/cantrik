@@ -1,9 +1,12 @@
 //! Tier 2 session memory: SQLite history, summaries, decisions (Sprint 7).
 
+mod adaptive_memory;
 mod anchors;
 mod context;
 mod db;
 mod paths;
+
+pub use adaptive_memory::record_approval_memory;
 
 pub use anchors::load_anchors_combined;
 pub use context::{build_llm_prompt, maybe_summarize_session};

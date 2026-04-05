@@ -216,6 +216,23 @@ pub async fn run() -> ExitCode {
             commands::init_cmd::run(&root, template.as_str())
         }
         Some(Command::Doctor) => commands::doctor::run(&cwd),
+        Some(Command::Health {
+            soft,
+            no_clippy,
+            no_test,
+            timeout_sec,
+        }) => {
+            commands::health::run(
+                &cwd,
+                &commands::health::HealthCli {
+                    soft: *soft,
+                    no_clippy: *no_clippy,
+                    no_test: *no_test,
+                    timeout_sec: *timeout_sec,
+                },
+            )
+            .await
+        }
         Some(Command::Ask { query }) => {
             let config = match load_merged_config(&cwd) {
                 Ok(config) => config,
@@ -282,13 +299,16 @@ pub async fn run() -> ExitCode {
                     path,
                     content_file,
                     approve,
-                } => commands::file_cmd::write_run(
-                    &config,
-                    &cwd,
-                    path,
-                    content_file.as_deref(),
-                    *approve,
-                ),
+                } => {
+                    commands::file_cmd::write_run(
+                        &config,
+                        &cwd,
+                        path,
+                        content_file.as_deref(),
+                        *approve,
+                    )
+                    .await
+                }
             }
         }
         Some(Command::Exec { approve, argv }) => {
@@ -299,7 +319,7 @@ pub async fn run() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-            commands::exec_cmd::run(&config, &cwd, *approve, argv.clone())
+            commands::exec_cmd::run(&config, &cwd, *approve, argv.clone()).await
         }
         Some(Command::Rgrep { args }) => {
             let config = match load_merged_config(&cwd) {
@@ -572,6 +592,34 @@ mod tests {
         let cli = Cli::try_parse_from(["cantrik", "--debug-config", "doctor"]).expect("parse");
         assert!(cli.global.debug_config);
         assert!(matches!(cli.cmd, Some(Command::Doctor)));
+    }
+
+    #[test]
+    fn parse_health_flags() {
+        let cli = Cli::try_parse_from([
+            "cantrik",
+            "health",
+            "--soft",
+            "--no-clippy",
+            "--no-test",
+            "--timeout-sec",
+            "60",
+        ])
+        .expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Health {
+                soft,
+                no_clippy,
+                no_test,
+                timeout_sec,
+            } => {
+                assert!(soft);
+                assert!(no_clippy);
+                assert!(no_test);
+                assert_eq!(timeout_sec, 60);
+            }
+            _ => panic!("expected health"),
+        }
     }
 
     #[test]

@@ -3,6 +3,8 @@ members = [
 	"crates/cantrik-cli",
 	"crates/cantrik-core",
 ]
+# Standalone helper; keep out of the main workspace lockfile.
+exclude = ["apps/cantrik-tray"]
 resolver = "2"
 
 [workspace.package]

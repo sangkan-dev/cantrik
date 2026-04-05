@@ -4,17 +4,18 @@ use std::path::Path;
 
 use sqlx::SqlitePool;
 
-use crate::config::{AppConfig, effective_cultural_wisdom};
+use crate::config::{
+    AppConfig, effective_adaptive_begawan, effective_adaptive_begawan_max_chars,
+    effective_cultural_wisdom,
+};
 use crate::cultural_wisdom;
 
 use super::{
-    ENV_NO_SUMMARY, MessageEntry, SessionError, latest_summary, list_all_messages_ordered,
-    save_summary,
+    ENV_NO_SUMMARY, MessageEntry, SessionError, adaptive_memory, latest_summary,
+    list_all_messages_ordered, list_messages_after, load_anchors_combined, save_summary,
+    session_project_fingerprint,
 };
 use crate::llm;
-
-use super::list_messages_after;
-use super::load_anchors_combined;
 use crate::skills::{
     format_rules_block, format_skills_block, load_rules_text, select_skills_for_prompt,
 };
@@ -141,6 +142,15 @@ pub async fn build_llm_prompt(
         parts.push(block);
     }
 
+    if effective_adaptive_begawan(&app.memory) {
+        let fp = session_project_fingerprint(cwd, app);
+        let max_c = effective_adaptive_begawan_max_chars(&app.memory);
+        let addon = adaptive_memory::adaptive_memory_prompt_addon(pool, &fp, max_c).await?;
+        if !addon.is_empty() {
+            parts.push(format!("{addon}\n"));
+        }
+    }
+
     if let Some(s) = &sum
         && !s.text.is_empty()
     {
@@ -237,6 +247,42 @@ mod tests {
             body.contains("cultural wisdom"),
             "expected cultural block in {body}"
         );
+
+        unsafe {
+            std::env::remove_var(crate::session::ENV_MEMORY_DB);
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn prompt_includes_adaptive_memory_when_enabled() {
+        use super::adaptive_memory::record_approval_memory;
+
+        let dir = std::env::temp_dir().join(format!("cantrik-adapt-prompt-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join(".cantrik")).unwrap();
+
+        unsafe { std::env::set_var(crate::session::ENV_MEMORY_DB, dir.join("db.sqlite")) };
+
+        let pool = connect_pool().await.expect("pool");
+        let sid = open_or_create_session(&pool, &dir).await.expect("session");
+        let fp = crate::session::session_project_fingerprint(&dir, &AppConfig::default());
+        record_approval_memory(&pool, &fp, "write_file", true, "touched README.md")
+            .await
+            .expect("rec");
+
+        let mut app = AppConfig::default();
+        app.memory.adaptive_begawan = Some(true);
+
+        let body = build_llm_prompt(&pool, &sid, &dir, &app, "hello")
+            .await
+            .expect("prompt");
+
+        assert!(
+            body.contains("Recent explicit user decisions"),
+            "expected adaptive block in {body}"
+        );
+        assert!(body.contains("README.md"), "body={body}");
 
         unsafe {
             std::env::remove_var(crate::session::ENV_MEMORY_DB);

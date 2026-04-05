@@ -349,12 +349,12 @@ default_model = "llama-3.3-70b-versatile"
 - [x] Hub / website — monorepo [`apps/cantrik-site`](apps/cantrik-site/) (SvelteKit static, nuansa Sangkan); target deploy `cantrik.sangkan.dev`; registry plugin = JSON statis MVP
 - [x] `cantrik init --template <name>` — MVP: `generic`, `rust-cli` (`.cantrik/cantrik.toml` + `rules.md`); template per framework penuh ditunda
 - [x] Saluran distribusi utama (MVP) — binary Linux via **GitHub Releases** pada tag `v*` (`.github/workflows/release.yml`); Homebrew/deb/Nix/winget = lanjutan
-- [ ] Air-gapped / enterprise offline mode — 100% lokal, tanpa cloud sama sekali
-- [ ] Packaging tambahan: Homebrew, deb/apt, pacman, Nix flake, winget (bertahap)
-- [ ] VS Code extension — side panel expose Cantrik capabilities
-- [ ] Desktop companion app (Tauri) — monitor daemon + notifikasi; scope rilis awal terbatas
-- [ ] Tech Debt Scanner production-ready: `/health` — outdated deps, CVE, test coverage, clippy (§4.14 PRD)
-- [ ] Adaptive Begawan Style Learning — belajar dari history approval, simpan ke Tier 4 Global Memory (§4.15 PRD)
+- [x] Air-gapped / enterprise offline mode — MVP: `[llm] offline` + `CANTRIK_OFFLINE`; rantai LLM hanya Ollama loopback; fitur lain tetap bisa pakai jaringan (terdokumentasi)
+- [x] Packaging tambahan (MVP): formula Homebrew + nfpm `.deb`; pacman / Nix / winget menyusul
+- [x] VS Code extension — palette + output channel + LSP stdio opsional ([`apps/cantrik-vscode`](apps/cantrik-vscode/))
+- [x] Desktop companion — polling flag approval + notifikasi ([`apps/cantrik-tray`](apps/cantrik-tray/)); shell Tauri penuh ditunda
+- [x] Tech Debt Scanner v0: `cantrik health` + `/health` di REPL (audit, clippy, test, timeout; bukan pengganti pipeline CI penuh)
+- [x] Adaptive Begawan MVP — tabel `approval_memory`, rekam `--approve` (file/exec/experiment), injeksi prompt + toggle `[memory] adaptive_begawan`
  
 **Batas MVP (Sprint 19):** Hub = landing + nav docs/registry; plugin list = `static/registry/plugins.json`; CI terpisah untuk site; tidak ada marketplace atau auth. Init = 2 template saja. Rilis = satu artefak `cantrik` (Linux) per tag; verifikasi checksum manual sampai ada signing otomatis.
  
@@ -364,7 +364,7 @@ default_model = "llama-3.3-70b-versatile"
  
 ## Backlog — Phase 4 lanjutan & Phase 5
  
-**Phase 4 (tunda dari Sprint 19):** mode air-gapped terdokumentasi + audit jaringan; Homebrew / distro packages; VS Code extension; Tauri companion; `/health` scanner; Adaptive Begawan.
+**Phase 4 (tunda / lanjutan):** audit jaringan menyeluruh untuk enterprise; pacman / Nix / winget; side panel VS Code kaya fitur; Tauri tray UI; cakupan `/health` (coverage, outdated tree) diperdalam.
  
 **Goal:** Phase 5 — Maturity & Excellence PRD.
  

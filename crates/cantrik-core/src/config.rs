@@ -576,6 +576,16 @@ pub fn effective_llm_offline(c: &LlmConfig) -> bool {
     c.offline.unwrap_or(false)
 }
 
+/// When offline mode is on, outbound HTTP CLI tools (`fetch`, `web`, …) should refuse (enterprise audit).
+pub fn offline_blocks_outbound_http(app: &AppConfig) -> bool {
+    effective_llm_offline(&app.llm)
+}
+
+/// User-visible reason when [`offline_blocks_outbound_http`] is true.
+pub fn offline_http_blocked_message() -> &'static str {
+    "refused: offline/air-gapped mode is on ([llm].offline or CANTRIK_OFFLINE); outbound HTTP is disabled"
+}
+
 /// Canonical, sorted, deduplicated extra roots from config (excludes the primary cwd).
 pub fn effective_workspace_extra_roots(primary: &Path, app: &AppConfig) -> Vec<PathBuf> {
     use std::collections::HashSet;

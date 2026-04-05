@@ -8,6 +8,8 @@ import {
 } from "vscode-languageclient/node";
 
 const OUTPUT = "Cantrik";
+const HUB = "https://cantrik.sangkan.dev";
+const REPO = "https://github.com/sangkan-dev/cantrik";
 let lspClient: LanguageClient | undefined;
 
 function cantrikOutput(): vscode.OutputChannel {
@@ -34,8 +36,47 @@ function runCantrikCapture(args: string[], title: string): void {
   }
 }
 
+type TreeCmd = { label: string; command: string; args?: string[] };
+
+const TREE_ITEMS: TreeCmd[] = [
+  { label: "Doctor", command: "cantrik.doctor" },
+  { label: "Health (audit only)", command: "cantrik.health" },
+  { label: "Version", command: "cantrik.version" },
+  { label: "Start LSP", command: "cantrik.startLsp" },
+  { label: "Stop LSP", command: "cantrik.stopLsp" },
+  { label: "Open hub", command: "cantrik.openHub" },
+  { label: "Open GitHub", command: "cantrik.openRepo" },
+];
+
+class CantrikTreeProvider implements vscode.TreeDataProvider<TreeCmd> {
+  getTreeItem(element: TreeCmd): vscode.TreeItem {
+    const item = new vscode.TreeItem(
+      element.label,
+      vscode.TreeItemCollapsibleState.None
+    );
+    item.command = {
+      command: element.command,
+      title: element.label,
+      arguments: element.args,
+    };
+    return item;
+  }
+
+  getChildren(): TreeCmd[] {
+    return TREE_ITEMS;
+  }
+
+  getParent(): null {
+    return null;
+  }
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
+    vscode.window.registerTreeDataProvider(
+      "cantrikSidePanel",
+      new CantrikTreeProvider()
+    ),
     vscode.commands.registerCommand("cantrik.doctor", () => {
       runCantrikCapture(["doctor"], "cantrik doctor");
     }),
@@ -73,6 +114,12 @@ export function activate(context: vscode.ExtensionContext): void {
         lspClient = undefined;
         vscode.window.showInformationMessage("Cantrik LSP stopped.");
       }
+    }),
+    vscode.commands.registerCommand("cantrik.openHub", async () => {
+      await vscode.env.openExternal(vscode.Uri.parse(HUB));
+    }),
+    vscode.commands.registerCommand("cantrik.openRepo", async () => {
+      await vscode.env.openExternal(vscode.Uri.parse(REPO));
     })
   );
 }

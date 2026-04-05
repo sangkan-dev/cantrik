@@ -366,6 +366,8 @@ default_model = "llama-3.3-70b-versatile"
  
 **Phase 4 (tunda / lanjutan):** audit jaringan menyeluruh untuk enterprise; pacman / Nix / winget; side panel VS Code kaya fitur; Tauri tray UI; cakupan `/health` (coverage, outdated tree) diperdalam.
  
+**Foundation (iterasi backlog, bukan penutup item):** tabel *Network surfaces* + blok HTTP saat offline; `cantrik health --tree` / `--outdated` / `--coverage`; artefak [`packaging/arch`](packaging/arch/PKGBUILD), [`packaging/nix`](packaging/nix/flake.nix), [`packaging/winget`](packaging/winget/Sangkan.Cantrik.yaml); panel aktivitas VS Code; [`apps/cantrik-tauri/README.md`](apps/cantrik-tauri/README.md); `cantrik fix --approve` menjalankan fetch; `cantrik status --json`; refleksi ringkas di loop re-plan; [`static/registry/recipes.json`](apps/cantrik-site/static/registry/recipes.json); [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh).
+ 
 **Goal:** Phase 5 — Maturity & Excellence PRD.
  
 - [ ] Full autonomous SWE-agent mode — end-to-end fix GitHub issues dengan high reliability

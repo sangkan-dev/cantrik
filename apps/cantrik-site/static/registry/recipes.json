@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "recipes": [
+    {
+      "id": "rust-cli",
+      "title": "Rust CLI starter",
+      "description": "Aligns with `cantrik init --template rust-cli`.",
+      "init_template": "rust-cli"
+    },
+    {
+      "id": "generic",
+      "title": "Generic project",
+      "description": "Minimal `.cantrik/` via `cantrik init --template generic`.",
+      "init_template": "generic"
+    }
+  ]
+}

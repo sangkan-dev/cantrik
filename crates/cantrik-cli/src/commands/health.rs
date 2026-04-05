@@ -15,6 +15,9 @@ pub struct HealthCli {
     pub no_test: bool,
     /// Per-check timeout (seconds).
     pub timeout_sec: u64,
+    pub tree: bool,
+    pub outdated: bool,
+    pub coverage: bool,
 }
 
 pub struct HealthReport {
@@ -145,6 +148,52 @@ pub async fn run_report(cwd: &Path, config: &AppConfig, cli: &HealthCli) -> Heal
             "--lib".into(),
         ];
         steps.push(run_step(cwd, "test (workspace --lib)", &test, t).await);
+    }
+
+    if cli.tree {
+        let tree_argv = vec![
+            "cargo".into(),
+            "tree".into(),
+            "--workspace".into(),
+            "--depth".into(),
+            "2".into(),
+            "-e".into(),
+            "normal".into(),
+        ];
+        steps.push(run_step(cwd, "cargo tree (depth 2)", &tree_argv, t).await);
+    }
+
+    if cli.outdated {
+        let probe = vec!["cargo".into(), "outdated".into(), "--version".into()];
+        let can = run_argv(cwd, &probe, std::cmp::min(15, t)).await;
+        let run_outdated = matches!(&can, Ok(o) if o.status.success());
+        if run_outdated {
+            let outdated_argv = vec![
+                "cargo".into(),
+                "outdated".into(),
+                "--workspace".into(),
+                "--format".into(),
+                "list".into(),
+            ];
+            steps.push(run_step(cwd, "cargo outdated", &outdated_argv, t).await);
+        } else {
+            steps.push(StepResult {
+                name: "cargo outdated",
+                ok: true,
+                detail: "skipped: install cargo-outdated (`cargo install cargo-outdated`)".into(),
+            });
+        }
+    }
+
+    if cli.coverage {
+        let cov = vec![
+            "cargo".into(),
+            "llvm-cov".into(),
+            "report".into(),
+            "--workspace".into(),
+            "--summary-only".into(),
+        ];
+        steps.push(run_step(cwd, "llvm-cov summary", &cov, t).await);
     }
 
     let mut any_fail = false;

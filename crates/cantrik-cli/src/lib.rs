@@ -192,7 +192,20 @@ pub async fn run() -> ExitCode {
             };
             commands::intelligence_cmd::run_audit(&config, &cwd)
         }
-        Some(Command::Fix { issue_url }) => commands::fix_cmd::run(issue_url),
+        Some(Command::Fix {
+            issue_url,
+            fetch,
+            approve,
+        }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("failed to load config: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            commands::fix_cmd::run(&cwd, &config, issue_url, *fetch, *approve).await
+        }
         Some(Command::Web { sub }) => commands::web_cmd::run(&cwd, sub).await,
         Some(Command::Visualize { mode, output }) => {
             commands::visualize_cmd::run(&cwd, *mode, output.clone())
@@ -221,6 +234,9 @@ pub async fn run() -> ExitCode {
             no_clippy,
             no_test,
             timeout_sec,
+            tree,
+            outdated,
+            coverage,
         }) => {
             commands::health::run(
                 &cwd,
@@ -229,6 +245,9 @@ pub async fn run() -> ExitCode {
                     no_clippy: *no_clippy,
                     no_test: *no_test,
                     timeout_sec: *timeout_sec,
+                    tree: *tree,
+                    outdated: *outdated,
+                    coverage: *coverage,
                 },
             )
             .await
@@ -371,7 +390,9 @@ pub async fn run() -> ExitCode {
         Some(Command::Background { no_notify, args }) => {
             commands::background_cmd::run(&cwd, !*no_notify, args).await
         }
-        Some(Command::Status { all, limit }) => commands::status_cmd::run(&cwd, *all, *limit).await,
+        Some(Command::Status { all, limit, json }) => {
+            commands::status_cmd::run(&cwd, *all, *limit, *json).await
+        }
         Some(Command::Daemon { poll_secs }) => commands::daemon_cmd::run(*poll_secs).await,
         Some(Command::Search {
             project,
@@ -604,6 +625,9 @@ mod tests {
             "--no-test",
             "--timeout-sec",
             "60",
+            "--tree",
+            "--outdated",
+            "--coverage",
         ])
         .expect("parse");
         match cli.cmd.expect("cmd") {
@@ -612,11 +636,17 @@ mod tests {
                 no_clippy,
                 no_test,
                 timeout_sec,
+                tree,
+                outdated,
+                coverage,
             } => {
                 assert!(soft);
                 assert!(no_clippy);
                 assert!(no_test);
                 assert_eq!(timeout_sec, 60);
+                assert!(tree);
+                assert!(outdated);
+                assert!(coverage);
             }
             _ => panic!("expected health"),
         }
@@ -752,10 +782,24 @@ mod tests {
             }
             _ => panic!("expected review"),
         }
-        let cli = Cli::try_parse_from(["cantrik", "fix", "https://github.com/a/b/issues/1"])
-            .expect("parse");
+        let cli = Cli::try_parse_from([
+            "cantrik",
+            "fix",
+            "https://github.com/a/b/issues/1",
+            "--fetch",
+            "--approve",
+        ])
+        .expect("parse");
         match cli.cmd.expect("cmd") {
-            Command::Fix { issue_url } => assert!(issue_url.contains("issues/1")),
+            Command::Fix {
+                issue_url,
+                fetch,
+                approve,
+            } => {
+                assert!(issue_url.contains("issues/1"));
+                assert!(fetch);
+                assert!(approve);
+            }
             _ => panic!("expected fix"),
         }
         let cli =

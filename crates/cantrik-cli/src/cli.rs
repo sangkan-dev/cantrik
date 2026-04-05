@@ -148,6 +148,9 @@ pub enum Command {
         all: bool,
         #[arg(long, default_value_t = 50_i64)]
         limit: i64,
+        /// Emit JSON (dashboard / automation MVP, Phase 5 backlog).
+        #[arg(long)]
+        json: bool,
     },
     /// Long-running worker: claims queued background jobs and runs a bounded LLM round each time.
     Daemon {
@@ -278,10 +281,16 @@ pub enum Command {
     Upgrade,
     /// Run `cargo audit` or `[intelligence].audit_command` (Sprint 17).
     Audit,
-    /// Issue URL: prints suggested workflow; full auto-fix deferred (Sprint 16).
+    /// GitHub (or any HTTP) issue URL: prints a guided workflow; with `--approve --fetch` fetches the page into stdout (MVP).
     Fix {
         #[arg(value_name = "ISSUE_URL")]
         issue_url: String,
+        /// Run `cantrik fetch` on the URL after user review (still requires network approval path).
+        #[arg(long)]
+        fetch: bool,
+        /// Execute the fetch step (`--fetch` implied). Without this, only prints the recipe.
+        #[arg(long)]
+        approve: bool,
     },
     /// Web search / fetch with explicit `--approve` (Sprint 16, PRD §4.13).
     Web {
@@ -332,6 +341,15 @@ pub enum Command {
         /// Timeout in seconds for each spawned check (default 300).
         #[arg(long, default_value_t = 300)]
         timeout_sec: u64,
+        /// Include `cargo tree --workspace --depth 2` (dependency overview).
+        #[arg(long)]
+        tree: bool,
+        /// Include `cargo outdated --workspace` (requires `cargo install cargo-outdated`).
+        #[arg(long)]
+        outdated: bool,
+        /// Include `cargo llvm-cov report --workspace --summary-only` (requires `cargo install cargo-llvm-cov` + llvm-tools).
+        #[arg(long)]
+        coverage: bool,
     },
     /// Print shell completions to stdout (write to a file or source from your shell).
     Completions {

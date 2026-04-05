@@ -4,6 +4,7 @@ use std::process::ExitCode;
 
 use cantrik_core::config::{
     effective_web_fetch_max_bytes, effective_web_search_max_results, load_merged_config,
+    offline_blocks_outbound_http, offline_http_blocked_message,
 };
 use cantrik_core::tool_system::{NetworkApproval, tool_web_fetch, tool_web_search};
 
@@ -81,6 +82,10 @@ pub async fn run(cwd: &Path, sub: &WebCommand) -> ExitCode {
             if !approve {
                 eprintln!("web fetch: would GET {url}; use --approve (same as `cantrik fetch`).");
                 return ExitCode::SUCCESS;
+            }
+            if offline_blocks_outbound_http(&config) {
+                eprintln!("web fetch: {}", offline_http_blocked_message());
+                return ExitCode::from(2);
             }
             let cap = effective_web_fetch_max_bytes(&config.git_workflow, *max_bytes);
             match tool_web_fetch(&config, url, cap, NetworkApproval::user_approved_network()).await

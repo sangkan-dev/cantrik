@@ -5,6 +5,7 @@ use std::process::ExitCode;
 
 use cantrik_core::background::{JobState, list_all_jobs, list_jobs_for_project};
 use cantrik_core::session::{connect_pool, project_fingerprint};
+use serde_json::json;
 
 fn state_label(s: JobState) -> &'static str {
     match s {
@@ -24,7 +25,7 @@ fn trunc(s: &str, max: usize) -> String {
     format!("{t}...")
 }
 
-pub async fn run(cwd: &Path, all_projects: bool, limit: i64) -> ExitCode {
+pub async fn run(cwd: &Path, all_projects: bool, limit: i64, json_out: bool) -> ExitCode {
     let pool = match connect_pool().await {
         Ok(p) => p,
         Err(e) => {
@@ -53,7 +54,45 @@ pub async fn run(cwd: &Path, all_projects: bool, limit: i64) -> ExitCode {
     };
 
     if jobs.is_empty() {
-        println!("(no background jobs)");
+        if json_out {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({ "jobs": [] }))
+                    .unwrap_or_else(|_| { "{\"jobs\":[]}".to_string() })
+            );
+        } else {
+            println!("(no background jobs)");
+        }
+        return ExitCode::SUCCESS;
+    }
+
+    if json_out {
+        let rows: Vec<serde_json::Value> = jobs
+            .iter()
+            .map(|j| {
+                json!({
+                    "id": j.id,
+                    "project_fingerprint": j.project_fingerprint,
+                    "cwd": j.cwd,
+                    "goal": j.goal,
+                    "state": j.state.as_str(),
+                    "last_error": j.last_error,
+                    "approval_hint": j.approval_hint,
+                    "rounds_done": j.rounds_done,
+                    "notify_on_approval": j.notify_on_approval,
+                    "created_at": j.created_at,
+                    "updated_at": j.updated_at,
+                    "heartbeat_at": j.heartbeat_at,
+                })
+            })
+            .collect();
+        match serde_json::to_string_pretty(&json!({ "jobs": rows })) {
+            Ok(s) => println!("{s}"),
+            Err(e) => {
+                eprintln!("cantrik status: json: {e}");
+                return ExitCode::FAILURE;
+            }
+        }
         return ExitCode::SUCCESS;
     }
 

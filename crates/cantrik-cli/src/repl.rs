@@ -348,6 +348,9 @@ fn handle_line(
                     no_clippy: true,
                     no_test: true,
                     timeout_sec: 180,
+                    tree: false,
+                    outdated: false,
+                    coverage: false,
                 };
                 let rep = rt.block_on(health::run_report(cwd, config, &cli));
                 for l in rep.lines {

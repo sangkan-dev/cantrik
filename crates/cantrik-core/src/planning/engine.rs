@@ -123,8 +123,10 @@ Reply with ONLY a JSON object: {{"success": true or false, "notes": "brief reaso
             .collect::<Vec<_>>()
             .join("\n");
 
+        let reflection = "Reflection (for the model): repeated failures often mean the goal is too large, prerequisites are missing, or step descriptions are ambiguous. Prefer fewer, smaller steps with explicit verification.\n\n";
+
         let replan_prompt = format!(
-            r#"The following plan did not succeed when evaluated. Produce a REVISED plan as JSON only.
+            r#"{reflection}The following plan did not succeed when evaluated. Produce a REVISED plan as JSON only.
 
 Goal: {goal}
 
@@ -136,6 +138,7 @@ Previous plan steps:
 
 Return JSON exactly in this shape:
 {{"steps":[{{"id":"1","description":"...","suggested_action":"optional"}}]}}"#,
+            reflection = reflection,
             plan_lines = plan_lines(&plan.steps),
         );
 

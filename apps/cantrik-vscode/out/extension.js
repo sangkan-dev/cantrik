@@ -39,6 +39,8 @@ const child_process = __importStar(require("child_process"));
 const vscode = __importStar(require("vscode"));
 const node_1 = require("vscode-languageclient/node");
 const OUTPUT = "Cantrik";
+const HUB = "https://cantrik.sangkan.dev";
+const REPO = "https://github.com/sangkan-dev/cantrik";
 let lspClient;
 function cantrikOutput() {
     return vscode.window.createOutputChannel(OUTPUT);
@@ -63,8 +65,34 @@ function runCantrikCapture(args, title) {
         vscode.window.showErrorMessage(`${title} failed — see Cantrik output channel`);
     }
 }
+const TREE_ITEMS = [
+    { label: "Doctor", command: "cantrik.doctor" },
+    { label: "Health (audit only)", command: "cantrik.health" },
+    { label: "Version", command: "cantrik.version" },
+    { label: "Start LSP", command: "cantrik.startLsp" },
+    { label: "Stop LSP", command: "cantrik.stopLsp" },
+    { label: "Open hub", command: "cantrik.openHub" },
+    { label: "Open GitHub", command: "cantrik.openRepo" },
+];
+class CantrikTreeProvider {
+    getTreeItem(element) {
+        const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
+        item.command = {
+            command: element.command,
+            title: element.label,
+            arguments: element.args,
+        };
+        return item;
+    }
+    getChildren() {
+        return TREE_ITEMS;
+    }
+    getParent() {
+        return null;
+    }
+}
 function activate(context) {
-    context.subscriptions.push(vscode.commands.registerCommand("cantrik.doctor", () => {
+    context.subscriptions.push(vscode.window.registerTreeDataProvider("cantrikSidePanel", new CantrikTreeProvider()), vscode.commands.registerCommand("cantrik.doctor", () => {
         runCantrikCapture(["doctor"], "cantrik doctor");
     }), vscode.commands.registerCommand("cantrik.health", () => {
         runCantrikCapture(["health", "--no-clippy", "--no-test"], "cantrik health");
@@ -92,6 +120,10 @@ function activate(context) {
             lspClient = undefined;
             vscode.window.showInformationMessage("Cantrik LSP stopped.");
         }
+    }), vscode.commands.registerCommand("cantrik.openHub", async () => {
+        await vscode.env.openExternal(vscode.Uri.parse(HUB));
+    }), vscode.commands.registerCommand("cantrik.openRepo", async () => {
+        await vscode.env.openExternal(vscode.Uri.parse(REPO));
     }));
 }
 function deactivate() {

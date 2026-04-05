@@ -12,6 +12,23 @@
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "cantrik",
+          "title": "Cantrik",
+          "icon": "resources/cantrik-view.svg"
+        }
+      ]
+    },
+    "views": {
+      "cantrik": [
+        {
+          "id": "cantrikSidePanel",
+          "name": "Commands & links"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "cantrik.doctor",
@@ -32,6 +49,14 @@
       {
         "command": "cantrik.stopLsp",
         "title": "Cantrik: Stop LSP"
+      },
+      {
+        "command": "cantrik.openHub",
+        "title": "Cantrik: Open hub (browser)"
+      },
+      {
+        "command": "cantrik.openRepo",
+        "title": "Cantrik: Open GitHub repository"
       }
     ]
   },

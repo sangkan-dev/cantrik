@@ -66,6 +66,9 @@ pub(crate) fn report_lines(cwd: &Path) -> Vec<String> {
             }
             if cantrik_core::config::effective_llm_offline(&config.llm) {
                 lines.push("  llm.offline (effective): true (Ollama loopback only)".to_string());
+                lines.push(
+                    "  outbound HTTP (fetch/web --approve): blocked in offline mode".to_string(),
+                );
             }
             if cantrik_core::config::effective_adaptive_begawan(&config.memory) {
                 lines

@@ -33,6 +33,28 @@ cargo test
 
 ---
 
+## Network surfaces (enterprise / air-gapped audit)
+
+Use this as a checklist when hardening or documenting deployments—not every path is blocked by `[llm] offline` / `CANTRIK_OFFLINE`.
+
+| Area | Mechanism | Notes |
+|------|-----------|--------|
+| LLM chat / streaming | `reqwest` to cloud APIs or Ollama | Offline mode restricts the **LLM chain** to loopback Ollama only. |
+| `cantrik fetch`, `cantrik web` | `reqwest` after `--approve` | **Blocked** when offline mode is on. |
+| Indexing / embeddings | Ollama (and LanceDB local) | Point Ollama at loopback for fully local embeddings. |
+| MCP client | Child stdio / configured servers | May reach network depending on server; review `providers.toml` / MCP config. |
+| Background jobs + webhooks | Optional HTTP POST | `[background].webhook_url`. |
+| Plugins (Lua/WASM) | Sandboxed but can expose tools | Review plugin code and capabilities. |
+
+### Phase 5 triage (contributors)
+
+- **Tree-sitter:** menambah bahasa = dependency baru di `crates/cantrik-core/Cargo.toml` + wiring indexer (satu bahasa per PR).
+- **Sandbox enterprise (gVisor / Firecracker):** titik masuk ada di `crates/cantrik-core/src/tool_system/sandbox.rs`; butuh desain admin + CI khusus.
+- **Hybrid SSH / cloud executor:** belum diimplementasi — wajib desain keamanan + flag eksplisit sebelum kode produksi.
+- **Benchmark SWE-bench / Terminal-Bench:** skrip baseline [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh) (quality gates saja); harness metrik menyusul.
+
+---
+
 ## Development Workflow
 
 ### 1. Choose or Create an Issue

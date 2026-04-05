@@ -1,0 +1,21 @@
+# Winget manifest (1.6). Update InstallerSha256 after each GitHub Release asset is published.
+# Submit with: winget validate / winget submit (Windows).
+PackageIdentifier: Sangkan.Cantrik
+PackageVersion: 0.1.0
+PackageLocale: en-US
+Publisher: Sangkan
+PublisherUrl: https://github.com/sangkan-dev
+PackageName: Cantrik
+PackageUrl: https://github.com/sangkan-dev/cantrik
+License: MIT
+LicenseUrl: https://github.com/sangkan-dev/cantrik/blob/main/LICENSE
+ShortDescription: Open-source AI CLI agent (Rust)
+Moniker: cantrik
+Installers:
+  - Architecture: x64
+    InstallerType: portable
+    InstallerUrl: https://github.com/sangkan-dev/cantrik/releases/download/v0.1.0/cantrik
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+    PortableCommandAlias: cantrik
+ManifestType: merged
+ManifestVersion: 1.6.0

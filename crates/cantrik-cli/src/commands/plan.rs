@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use cantrik_core::config::{AppConfig, effective_max_replan_cycles, effective_stuck_threshold};
 use cantrik_core::planning::{
@@ -21,6 +22,25 @@ struct PlanStateFile {
 
 fn plan_state_path(cwd: &Path) -> PathBuf {
     cwd.join(".cantrik").join(PLAN_STATE_FILE)
+}
+
+fn write_plan_run_summary(cwd: &Path, goal: &str, outcome: &str, detail: Option<&str>) {
+    let dir = cwd.join(".cantrik");
+    let _ = fs::create_dir_all(&dir);
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let v = serde_json::json!({
+        "schema_version": 1u32,
+        "finished_at_unix": ts,
+        "goal": goal,
+        "outcome": outcome,
+        "detail": detail,
+    });
+    if let Ok(text) = serde_json::to_string_pretty(&v) {
+        let _ = fs::write(dir.join("plan-run-summary.json"), text);
+    }
 }
 
 fn save_plan_state(cwd: &Path, goal: &str, plan: &Plan) -> Result<(), String> {
@@ -130,16 +150,20 @@ Task to plan:\n{goal}"
             .map_err(|e| PlanLoopError::Llm(e.to_string()))
     });
 
-    match outcome {
+    match &outcome {
         Ok(PlanOutcome::Completed) => {
+            write_plan_run_summary(cwd, &goal_owned, "completed", None);
             println!("\nplan --run: all steps evaluated successfully (per model).");
             ExitCode::SUCCESS
         }
         Ok(PlanOutcome::Escalated { message }) => {
+            write_plan_run_summary(cwd, &goal_owned, "escalated", Some(message.as_str()));
             eprintln!("\n{message}");
             ExitCode::from(1)
         }
         Err(e) => {
+            let msg = e.to_string();
+            write_plan_run_summary(cwd, &goal_owned, "error", Some(msg.as_str()));
             eprintln!("plan --run: {e}");
             ExitCode::from(1)
         }

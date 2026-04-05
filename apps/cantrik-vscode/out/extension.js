@@ -44,14 +44,20 @@ const REPO = "https://github.com/sangkan-dev/cantrik";
 const REGISTRY = "https://cantrik.sangkan.dev/registry";
 let lspClient;
 let statusBar;
+function cantrikExecutable() {
+    const v = vscode.workspace.getConfiguration("cantrik").get("executablePath");
+    const t = v?.trim();
+    return t && t.length > 0 ? t : "cantrik";
+}
 function cantrikOutput() {
     return vscode.window.createOutputChannel(OUTPUT);
 }
 function runCantrikCapture(args, title) {
     const ch = cantrikOutput();
-    ch.appendLine(`$ cantrik ${args.join(" ")}`);
+    const bin = cantrikExecutable();
+    ch.appendLine(`$ ${bin} ${args.join(" ")}`);
     try {
-        const out = child_process.execFileSync("cantrik", args, {
+        const out = child_process.execFileSync(bin, args, {
             encoding: "utf8",
             maxBuffer: 8 * 1024 * 1024,
         });
@@ -103,7 +109,7 @@ class CantrikStatusWebviewProvider {
                 return;
             }
             try {
-                const out = child_process.execFileSync("cantrik", ["status", "--json"], {
+                const out = child_process.execFileSync(cantrikExecutable(), ["status", "--json"], {
                     cwd: root,
                     encoding: "utf8",
                     maxBuffer: 16 * 1024 * 1024,
@@ -209,7 +215,7 @@ function activate(context) {
             lspClient = undefined;
         }
         const serverOptions = {
-            command: "cantrik",
+            command: cantrikExecutable(),
             args: ["lsp"],
             transport: node_1.TransportKind.stdio,
         };

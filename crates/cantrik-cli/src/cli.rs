@@ -297,6 +297,9 @@ pub enum Command {
         /// After a successful fetch, run `cantrik agents` with a structured goal (requires `--approve` and `--fetch`).
         #[arg(long)]
         run_agents: bool,
+        /// After fetch (and after `--run-agents` if set), run `cantrik experiment --approve` with a structured goal (requires `--approve` and `--fetch`).
+        #[arg(long)]
+        run_experiment: bool,
     },
     /// Web search / fetch with explicit `--approve` (Sprint 16, PRD §4.13).
     Web {
@@ -359,6 +362,9 @@ pub enum Command {
         /// Include `cargo deny check` (requires `cargo install cargo-deny` and a `deny.toml` in the project).
         #[arg(long)]
         deny: bool,
+        /// Include `cargo audit` (requires `cargo install cargo-audit`).
+        #[arg(long)]
+        audit: bool,
     },
     /// Print shell completions to stdout (write to a file or source from your shell).
     Completions {

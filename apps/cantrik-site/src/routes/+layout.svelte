@@ -26,6 +26,7 @@
 		<nav class="flex flex-wrap gap-4 font-mono text-sm">
 			<a class="text-ash hover:text-gold" href={resolve('/docs')}>Docs</a>
 			<a class="text-ash hover:text-gold" href={resolve('/registry')}>Plugin registry</a>
+			<a class="text-ash hover:text-gold" href={resolve('/registry/recipes')}>Recipes</a>
 			<a class="text-ash hover:text-gold" href={resolve('/dashboard')}>Dashboard</a>
 			<a
 				class="text-ash hover:text-gold"

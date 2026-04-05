@@ -20,7 +20,7 @@ Artifact: `target/release/cantrik`.
 
 1. After publishing the release asset, compute SHA-256 of `cantrik` (Linux portable in manifest today matches [release.yml](../.github/workflows/release.yml)).
 2. Set `InstallerSha256` (64 hex chars, no spaces).
-3. Validate on Windows: `winget validate packaging/winget/Sangkan.Cantrik.yaml`.
+3. Validate on Windows: `winget validate packaging/winget/Sangkan.Cantrik.yaml` (job opsional CI: [`.github/workflows/winget-validate.yml`](../.github/workflows/winget-validate.yml)).
 
 ## nfpm `.deb`
 

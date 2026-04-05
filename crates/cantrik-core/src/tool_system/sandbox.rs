@@ -35,7 +35,9 @@ pub fn command_for_exec(
 
     match level {
         SandboxLevel::Container => {
-            Err("sandbox level 'container' is not implemented (Sprint 8)".into())
+            Err(
+                "sandbox level 'container' is reserved for future gVisor/Firecracker-style isolation (enterprise backlog); use 'restricted' (default) or 'none' (insecure) today".into(),
+            )
         }
         SandboxLevel::None => Ok(direct_command(program, argv, &cwd)),
         SandboxLevel::Restricted => {

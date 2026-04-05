@@ -1,0 +1,20 @@
+# Validates Winget manifest on Windows (packaging backlog). Optional; does not gate Linux CI.
+name: winget validate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - "packaging/winget/**"
+  pull_request:
+    paths:
+      - "packaging/winget/**"
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: winget validate manifest
+        run: winget validate --manifest packaging/winget/Sangkan.Cantrik.yaml

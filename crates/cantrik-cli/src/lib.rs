@@ -197,6 +197,7 @@ pub async fn run() -> ExitCode {
             fetch,
             approve,
             run_agents,
+            run_experiment,
         }) => {
             let config = match load_merged_config(&cwd) {
                 Ok(c) => c,
@@ -212,6 +213,7 @@ pub async fn run() -> ExitCode {
                 *fetch,
                 *approve,
                 *run_agents,
+                *run_experiment,
             )
             .await
         }
@@ -247,6 +249,7 @@ pub async fn run() -> ExitCode {
             outdated,
             coverage,
             deny,
+            audit,
         }) => {
             commands::health::run(
                 &cwd,
@@ -259,6 +262,7 @@ pub async fn run() -> ExitCode {
                     outdated: *outdated,
                     coverage: *coverage,
                     deny: *deny,
+                    audit: *audit,
                 },
             )
             .await
@@ -649,6 +653,7 @@ mod tests {
             "--outdated",
             "--coverage",
             "--deny",
+            "--audit",
         ])
         .expect("parse");
         match cli.cmd.expect("cmd") {
@@ -661,6 +666,7 @@ mod tests {
                 outdated,
                 coverage,
                 deny,
+                audit,
             } => {
                 assert!(soft);
                 assert!(no_clippy);
@@ -670,6 +676,7 @@ mod tests {
                 assert!(outdated);
                 assert!(coverage);
                 assert!(deny);
+                assert!(audit);
             }
             _ => panic!("expected health"),
         }
@@ -820,11 +827,13 @@ mod tests {
                 fetch,
                 approve,
                 run_agents,
+                run_experiment,
             } => {
                 assert!(issue_url.contains("issues/1"));
                 assert!(fetch);
                 assert!(approve);
                 assert!(run_agents);
+                assert!(!run_experiment);
             }
             _ => panic!("expected fix"),
         }

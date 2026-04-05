@@ -12,6 +12,16 @@
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Cantrik",
+      "properties": {
+        "cantrik.executablePath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the cantrik binary. When empty, uses \"cantrik\" from PATH."
+        }
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {

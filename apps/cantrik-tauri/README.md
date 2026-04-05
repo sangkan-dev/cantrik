@@ -22,4 +22,4 @@ npm run tauri build
 
 The Rust crate lives under `src-tauri/` and is listed in the root workspace **`exclude`** so it keeps its own `Cargo.lock`.
 
-Approval notifications for background jobs still use the paths from [`crates/cantrik-core/src/background/mod.rs`](../../crates/cantrik-core/src/background/mod.rs) (`notification_channels_from_config`); this tray app does not poll flags yet—that remains the role of `cantrik-tray` until wired here.
+A background thread polls the default approval flag under the OS data directory (`…/cantrik/approval-pending.flag`), same default as [`cantrik-tray`](../cantrik-tray/). Override path in project config via `[background].approval_flag_path` is **not** read by this app yet (use `cantrik-tray` for custom paths until wired).

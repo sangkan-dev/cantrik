@@ -50,13 +50,40 @@ Use this as a checklist when hardening or documenting deployments—not every pa
 | Voice (`cantrik listen`) | POST to local Ollama `/api/transcribe` | Usually loopback; still HTTP. |
 | Plugins (Lua/WASM) | Sandboxed but can expose tools | Review plugin code and capabilities. |
 
+### Enterprise release checklist
+
+Sebelum rilis atau deploy ke lingkungan ketat, tinjau ulang (bukan sekali jalan otomatis):
+
+- [ ] Daftar MCP: setiap `[[mcp_client.servers]]` — proses apa yang di-spawn, apakah tool-nya bisa keluar jaringan.
+- [ ] Plugin (Lua/WASM): sumber tepercaya; kemampuan tool yang diekspos.
+- [ ] `[background].webhook_url`: URL tujuan, TLS, siapa yang membaca payload approval.
+- [ ] Embedding / Ollama: host loopback vs remote; data apa yang dikirim.
+- [ ] `CANTRIK_OFFLINE` / `[llm].offline`: sudah sesuai kebijakan untuk fetch, agent tools, dan webhook (lihat tabel di atas).
+
+### Self-improvement (safe profile)
+
+Menjalankan Cantrik pada **repo Cantrik sendiri** untuk saran perbaikan:
+
+- Gunakan sandbox `restricted`, batasi token/konteks di config, jangan `--approve` massal tanpa review diff.
+- Anggap biaya API dan risiko prompt injection dari konten repo; dokumentasikan asumsi di issue/PR.
+- Otomatisasi penuh “self-rewrite” tetap di backlog hingga ada gate produk (tes, approval, rollback).
+
+### SWE constrained workflow (manual checklist)
+
+Alur terbatas untuk satu issue publik + satu repo lokal:
+
+1. Set `ISSUE_URL` dan jalankan [`scripts/swe-fix-demo.sh`](scripts/swe-fix-demo.sh) **atau** `cantrik fix "$URL" --approve --fetch` lalu tinjau HTML di stdout.
+2. Opsional: `--run-agents` (batas waktu: env `CANTRIK_FIX_AGENT_TIMEOUT_SEC`, default 900).
+3. Opsional: `--experiment` — masih membutuhkan `--approve`; menjalankan mode experiment (writes + tes + revert) — review diff sebelum commit.
+4. `cantrik pr create --approve` atau alur Git manual; tidak ada jaminan “high reliability” sampai ada tes integrasi produk.
+
 ### Phase 5 triage (contributors)
 
-- **Tree-sitter:** menambah bahasa = dependency baru di `crates/cantrik-core/Cargo.toml` + wiring indexer (satu bahasa per PR).
+- **Tree-sitter:** lihat [`docs/tree-sitter-language-extensions.md`](docs/tree-sitter-language-extensions.md) (kompatibilitas grammar vs versi `tree-sitter` workspace); satu bahasa per PR.
 - **Sandbox enterprise (gVisor / Firecracker):** titik masuk ada di `crates/cantrik-core/src/tool_system/sandbox.rs`; butuh desain admin + CI khusus.
-- **Hybrid SSH / cloud executor:** belum diimplementasi — wajib desain keamanan + flag eksplisit sebelum kode produksi.
+- **Hybrid SSH / cloud executor:** RFC [`docs/rfc-hybrid-ssh-executor.md`](docs/rfc-hybrid-ssh-executor.md); implementasi setelah threat model disetujui.
 - **Benchmark SWE-bench / Terminal-Bench:** skrip baseline [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh) (quality gates + hook `CANTRIK_BENCH_HARNESS=1`); demo alur terbatas [`scripts/swe-fix-demo.sh`](scripts/swe-fix-demo.sh) dengan `ISSUE_URL=…`.
-- **`cantrik fix` / agents:** `cantrik fix URL --approve --fetch --run-agents` merantai fetch + orchestrator; `cantrik agents "…" --reflect` menambah satu putaran “reviewer” LLM setelah sintesis.
+- **`cantrik fix` / agents:** `cantrik fix URL --approve --fetch --run-agents` (+ timeout `CANTRIK_FIX_AGENT_TIMEOUT_SEC`); `--run-experiment` merantai mode experiment; `cantrik agents "…" --reflect` = satu putaran reviewer LLM.
 
 ---
 

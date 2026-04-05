@@ -21,6 +21,33 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Same default flag path as `cantrik-tray` / `[background].approval_flag_path` default.
+            std::thread::spawn(|| {
+                use std::path::PathBuf;
+                use std::time::Duration;
+                let flag_path = dirs::data_local_dir()
+                    .unwrap_or_else(|| PathBuf::from("."))
+                    .join("cantrik")
+                    .join("approval-pending.flag");
+                let mut was_present = flag_path.exists();
+                loop {
+                    let present = flag_path.exists();
+                    if present && !was_present {
+                        let body = std::fs::read_to_string(&flag_path)
+                            .map(|s| format!("Job id / hint: {}", s.trim()))
+                            .unwrap_or_else(|_| {
+                                "Approval pending — see `cantrik background`.".to_string()
+                            });
+                        let _ = notify_rust::Notification::new()
+                            .summary("Cantrik — approval needed")
+                            .body(&body)
+                            .show();
+                    }
+                    was_present = present;
+                    std::thread::sleep(Duration::from_secs(8));
+                }
+            });
             Ok(())
         })
         .run(tauri::generate_context!())

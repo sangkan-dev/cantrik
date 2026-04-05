@@ -352,6 +352,7 @@ fn handle_line(
                     outdated: false,
                     coverage: false,
                     deny: false,
+                    audit: false,
                 };
                 let rep = rt.block_on(health::run_report(cwd, config, &cli));
                 for l in rep.lines {

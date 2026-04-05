@@ -1,0 +1,16 @@
+# Placeholder for SWE-bench / Terminal-Bench wiring. Run manually; does not gate releases.
+name: benchmark harness
+
+on:
+  workflow_dispatch:
+
+jobs:
+  note:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: |
+          echo "Plug external harness here (e.g. clone SWE-bench, run cantrik against tasks)."
+          echo "Local baseline: ./scripts/phase5-smoke.sh"
+          echo "Optional hook: CANTRIK_BENCH_HARNESS=1"

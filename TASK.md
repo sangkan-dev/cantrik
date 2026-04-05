@@ -364,22 +364,49 @@ default_model = "llama-3.3-70b-versatile"
  
 ## Backlog — Phase 4 lanjutan & Phase 5
  
-**Phase 4 (tunda / lanjutan):** audit jaringan menyeluruh untuk enterprise; pacman / Nix / winget; side panel VS Code kaya fitur; Tauri tray UI; cakupan `/health` (coverage, outdated tree) diperdalam.
+**Foundation (iterasi backlog, bukan penutup checklist):** tabel *Network surfaces* + blok HTTP saat offline; `cantrik health --tree` / `--outdated` / `--coverage` / `--deny` / `--audit` (opsional); artefak [`packaging/arch`](packaging/arch/PKGBUILD), [`packaging/nix`](packaging/nix/flake.nix), [`packaging/winget`](packaging/winget/Sangkan.Cantrik.yaml); CI [`winget validate`](.github/workflows/winget-validate.yml); panel VS Code + setting `cantrik.executablePath` + webview `status --json`; [`apps/cantrik-tauri`](apps/cantrik-tauri/) tray + polling flag; `cantrik fix` + `--run-agents` / `--run-experiment`; `cantrik status --json`; `cantrik agents --reflect`; [`/dashboard`](apps/cantrik-site/src/routes/dashboard/+page.svelte) + [`/registry/recipes`](apps/cantrik-site/src/routes/registry/recipes/+page.svelte); [`static/registry/recipes.json`](apps/cantrik-site/static/registry/recipes.json); [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh) + [`scripts/swe-fix-demo.sh`](scripts/swe-fix-demo.sh); ringkasan `plan --run` → [`.cantrik/plan-run-summary.json`](crates/cantrik-cli/src/commands/plan.rs).
  
-**Foundation (iterasi backlog, bukan penutup item):** tabel *Network surfaces* + blok HTTP saat offline; `cantrik health --tree` / `--outdated` / `--coverage` / `--deny` (opsional); artefak [`packaging/arch`](packaging/arch/PKGBUILD), [`packaging/nix`](packaging/nix/flake.nix), [`packaging/winget`](packaging/winget/Sangkan.Cantrik.yaml); panel aktivitas VS Code + status bar + webview status JSON; [`apps/cantrik-tauri`](apps/cantrik-tauri/) (Tauri v2 tray buildable); `cantrik fix --approve --fetch` dan rantai `--run-agents`; `cantrik status --json`; `cantrik agents --reflect`; halaman [`/dashboard`](apps/cantrik-site/src/routes/dashboard/+page.svelte); [`static/registry/recipes.json`](apps/cantrik-site/static/registry/recipes.json); [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh) + [`scripts/swe-fix-demo.sh`](scripts/swe-fix-demo.sh).
+### Phase 4 lanjutan (terukur)
  
-**Goal:** Phase 5 — Maturity & Excellence PRD.
+- [ ] **Enterprise / air-gap audit** — checklist rilis per deploy (MCP, plugin, webhook, embedding); lihat [CONTRIBUTING.md](CONTRIBUTING.md) § *Enterprise release checklist*.
+- [ ] **Distribusi matang** — PKGBUILD `sha256sums` riil per tag; Winget `InstallerSha256` + `winget validate` di CI; Nix derivasi from-source **atau** DoD devShell-only ([`packaging/README.md`](packaging/README.md)).
+- [ ] **VS Code polish** — opsional perintah konteks folder (sudah ada: `cantrik.executablePath`, status bar, webview).
+- [ ] **Tauri + approval UX** — polling `approval-pending.flag` setara [`cantrik-tray`](apps/cantrik-tray/) ([`apps/cantrik-tauri`](apps/cantrik-tauri/)).
+- [ ] **Health mendalam** — opsional SARIF / gate CI tambahan (`cantrik health --audit` sudah ada jika `cargo-audit` terpasang).
  
-- [ ] Full autonomous SWE-agent mode — end-to-end fix GitHub issues dengan high reliability
-- [ ] Agent harness improvements: self-reflection loops, better re-planning, visibility dashboard
-- [ ] Self-improvement: Cantrik menganalisis dan suggest improvement ke codebase Cantrik sendiri
-- [ ] Benchmark formal vs SWE-bench / Terminal-Bench
-- [ ] Community-driven recipes & templates di cantrik.dev
-- [ ] Hybrid cloud execution: opt-in via SSH ke instance sendiri untuk task berat
-- [ ] Perluasan bahasa tree-sitter: Kotlin, Swift, Dart, Zig, dll.
-- [ ] TUI Split Pane jika belum selesai di Sprint 18
-- [ ] `cantrik fix <issue-url>` full implementation jika di-defer di Sprint 16
-- [ ] gVisor / Firecracker sandbox untuk isolasi enterprise-grade
+### Phase 5 — Maturity & Excellence
+ 
+- [ ] **Full autonomous SWE-agent** — end-to-end fix GitHub issues dengan reliabilitas tinggi  
+  - [x] Alur terbatas: `cantrik fix URL --approve --fetch --run-agents` + timeout agents (`CANTRIK_FIX_AGENT_TIMEOUT_SEC`); demo [`scripts/swe-fix-demo.sh`](scripts/swe-fix-demo.sh); checklist manual [CONTRIBUTING.md](CONTRIBUTING.md) § *SWE constrained workflow*.  
+  - [ ] Otomatisasi penuh + tes regresi produk.
+- [ ] **Agent harness** (refleksi, re-plan, dashboard)  
+  - [x] Refleksi: `cantrik agents … --reflect`.  
+  - [x] Dashboard statis: [`/dashboard`](apps/cantrik-site/src/routes/dashboard/+page.svelte); `cantrik status --json`.  
+  - [x] Re-plan terkonfigurasi: `[planning] max_replan_cycles` / `stuck_threshold_attempts`; ringkasan `plan --run` → `.cantrik/plan-run-summary.json`.  
+  - [ ] Agregat multi-sesi / UI kaya di luar JSON statis.
+- [ ] **Self-improvement pada repo Cantrik**  
+  - [x] MVP dokumen: profil aman + etika/biaya ([CONTRIBUTING.md](CONTRIBUTING.md) § *Self-improvement (safe profile)*).  
+  - [ ] Otomatisasi saran patch ke repo sendiri dengan gate produk.
+- [ ] **Benchmark formal** (SWE-bench / Terminal-Bench)  
+  - [x] Baseline: [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh); hook `CANTRIK_BENCH_HARNESS=1`.  
+  - [ ] Job CI opsional / harness terukur terpasang ([`.github/workflows/benchmark-harness.yml`](.github/workflows/benchmark-harness.yml)).
+- [ ] **Recipes & templates di cantrik.dev**  
+  - [x] JSON [`static/registry/recipes.json`](apps/cantrik-site/static/registry/recipes.json).  
+  - [x] Halaman [`/registry/recipes`](apps/cantrik-site/src/routes/registry/recipes/+page.svelte).  
+  - [ ] Kirim komunitas + skema review terbuka.
+- [ ] **Hybrid SSH / cloud executor**  
+  - [x] RFC desain: [`docs/rfc-hybrid-ssh-executor.md`](docs/rfc-hybrid-ssh-executor.md).  
+  - [ ] Implementasi executor + config + approval UI.
+- [ ] **Tree-sitter tambahan** (Kotlin, Swift, …)  
+  - [x] Catatan kompatibilitas grammar vs `tree-sitter` workspace: [`docs/tree-sitter-language-extensions.md`](docs/tree-sitter-language-extensions.md).  
+  - [ ] Satu bahasa per PR saat crate grammar mendukung TS 0.26+.
+- [x] **TUI split pane** — selesai Sprint 18 (`[ui] tui_split_pane`, TASK § Sprint 18). **Ditunda:** panel semantic diff / approval penuh (§6 Enhancement PRD).  
+- [ ] **`cantrik fix` penuh**  
+  - [x] `--approve --fetch`, `--run-agents`, `--experiment` (rantai eksperimental, approval eksplisit).  
+  - [ ] Kebijakan produk + tes integrasi untuk pipeline penuh.
+- [ ] **Sandbox enterprise** (gVisor / Firecracker)  
+  - [x] Dokumentasi + arah di [`sandbox.rs`](crates/cantrik-core/src/tool_system/sandbox.rs); level `container` = placeholder.  
+  - [ ] Backend micro-VM / runsc + CI khusus + feature flag admin.
  
 ---
  

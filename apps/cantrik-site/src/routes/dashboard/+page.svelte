@@ -14,7 +14,10 @@
 		<li>
 			<a class="text-gold hover:text-gold-bright" href={resolve('/registry')}>Plugin registry</a>
 		</li>
-		<li>Recipes path: <code class="text-gold-dim">/registry/recipes.json</code></li>
+		<li>
+			<a class="text-gold hover:text-gold-bright" href={resolve('/registry/recipes')}>Recipe registry</a>
+			— <code class="text-gold-dim">/registry/recipes.json</code>
+		</li>
 		<li>Multi-agent reviewer: <code class="text-gold-dim">cantrik agents "..." --reflect</code></li>
 	</ul>
 	<p class="mt-10">

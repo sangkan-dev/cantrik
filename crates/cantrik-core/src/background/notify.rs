@@ -5,6 +5,8 @@ use std::process::Command;
 
 use serde::Serialize;
 
+use crate::config::{AppConfig, offline_blocks_outbound_http};
+
 /// Resolved notification targets for one approval event.
 #[derive(Debug, Clone, Default)]
 pub struct NotificationChannels {
@@ -52,7 +54,13 @@ fn try_flag(path: &Path, job_id: &str) {
 }
 
 /// Each channel is best-effort; failures are ignored.
-pub async fn notify_approval_needed(job_id: &str, hint: &str, channels: &NotificationChannels) {
+/// Webhook POST is skipped when [`offline_blocks_outbound_http`] is true so air-gapped runs do not emit outbound HTTP.
+pub async fn notify_approval_needed(
+    job_id: &str,
+    hint: &str,
+    channels: &NotificationChannels,
+    config: &AppConfig,
+) {
     if channels.desktop {
         try_desktop(
             "Cantrik — approval needed",
@@ -65,6 +73,9 @@ pub async fn notify_approval_needed(job_id: &str, hint: &str, channels: &Notific
     }
 
     if let Some(url) = channels.webhook_url.as_ref() {
+        if offline_blocks_outbound_http(config) {
+            return;
+        }
         let client = match reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()

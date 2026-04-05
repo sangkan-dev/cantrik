@@ -31,6 +31,7 @@ async fn max_depth_blocks_without_llm() {
         depth: 5,
         dry_run: false,
         max_parallel_override: None,
+        reflect: false,
     };
     let err = run_orchestrated(&config, "any goal", opts)
         .await

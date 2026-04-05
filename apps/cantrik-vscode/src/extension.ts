@@ -10,7 +10,9 @@ import {
 const OUTPUT = "Cantrik";
 const HUB = "https://cantrik.sangkan.dev";
 const REPO = "https://github.com/sangkan-dev/cantrik";
+const REGISTRY = "https://cantrik.sangkan.dev/registry";
 let lspClient: LanguageClient | undefined;
+let statusBar: vscode.StatusBarItem | undefined;
 
 function cantrikOutput(): vscode.OutputChannel {
   return vscode.window.createOutputChannel(OUTPUT);
@@ -33,6 +35,113 @@ function runCantrikCapture(args: string[], title: string): void {
     ch.appendLine(msg);
     ch.show(true);
     vscode.window.showErrorMessage(`${title} failed — see Cantrik output channel`);
+  }
+}
+
+function workspaceRoot(): string | undefined {
+  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+}
+
+function refreshStatusBar(): void {
+  if (!statusBar) {
+    return;
+  }
+  const root = workspaceRoot();
+  const label = root ? vscode.workspace.workspaceFolders![0].name : "no folder";
+  statusBar.text = `$(hubot) Cantrik · ${label}`;
+  statusBar.tooltip = "Cantrik — resolving version…";
+  statusBar.show();
+  child_process.execFile(
+    "cantrik",
+    ["--version"],
+    { encoding: "utf8", timeout: 12_000 },
+    (err, stdout) => {
+      const ver = err ? "cantrik?" : stdout.trim().split("\n")[0] || "?";
+      statusBar!.tooltip = `${ver}\nWorkspace: ${root ?? "(open a folder)"}`;
+      statusBar!.text = `$(hubot) ${ver} · ${label}`;
+    }
+  );
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+class CantrikStatusWebviewProvider implements vscode.WebviewViewProvider {
+  public static readonly viewId = "cantrikStatusWebview";
+
+  resolveWebviewView(webviewView: vscode.WebviewView): void | Thenable<void> {
+    webviewView.webview.options = { enableScripts: true };
+    const refresh = (): void => {
+      const root = workspaceRoot();
+      if (!root) {
+        webviewView.webview.html = CantrikStatusWebviewProvider.htmlPage(
+          "Open a workspace folder to run `cantrik status --json` here."
+        );
+        return;
+      }
+      try {
+        const out = child_process.execFileSync("cantrik", ["status", "--json"], {
+          cwd: root,
+          encoding: "utf8",
+          maxBuffer: 16 * 1024 * 1024,
+        });
+        webviewView.webview.html = CantrikStatusWebviewProvider.htmlPage(out.trimEnd());
+      } catch (e: unknown) {
+        const err = e as { stderr?: string; stdout?: string; message?: string };
+        const msg = err.stderr || err.stdout || err.message || String(e);
+        webviewView.webview.html = CantrikStatusWebviewProvider.htmlPage(msg);
+      }
+    };
+    webviewView.webview.onDidReceiveMessage(
+      async (m: { type?: string; url?: string }) => {
+        if (m.type === "refresh") {
+          refresh();
+        } else if (m.type === "openExternal" && m.url) {
+          await vscode.env.openExternal(vscode.Uri.parse(m.url));
+        }
+      }
+    );
+    refresh();
+  }
+
+  private static htmlPage(body: string): string {
+    const safe = escapeHtml(body);
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
+  <style>
+    body { font-family: var(--vscode-font-family); font-size: 12px; color: var(--vscode-foreground); margin: 8px; }
+    pre { white-space: pre-wrap; word-break: break-word; background: var(--vscode-editor-inactiveSelectionBackground); padding: 8px; border-radius: 4px; }
+    a { color: var(--vscode-textLink-foreground); }
+    button { margin: 6px 0; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <p><strong>Cantrik</strong> — hub, registry, and local <code>status --json</code>.</p>
+  <p>
+    <a href="#" id="hub">Hub</a> ·
+    <a href="#" id="reg">Registry</a> ·
+    <a href="#" id="repo">GitHub</a>
+  </p>
+  <button id="btn">Refresh status (--json)</button>
+  <pre id="out">${safe}</pre>
+  <script>
+    const vscode = acquireVsCodeApi();
+    document.getElementById('btn').onclick = () => vscode.postMessage({ type: 'refresh' });
+    function openUrl(u) { vscode.postMessage({ type: 'openExternal', url: u }); }
+    document.getElementById('hub').onclick = (e) => { e.preventDefault(); openUrl('${HUB}'); };
+    document.getElementById('reg').onclick = (e) => { e.preventDefault(); openUrl('${REGISTRY}'); };
+    document.getElementById('repo').onclick = (e) => { e.preventDefault(); openUrl('${REPO}'); };
+  </script>
+</body>
+</html>`;
   }
 }
 
@@ -72,11 +181,30 @@ class CantrikTreeProvider implements vscode.TreeDataProvider<TreeCmd> {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  statusBar.command = "cantrik.showOutput";
+  context.subscriptions.push(statusBar);
+  refreshStatusBar();
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(() => refreshStatusBar())
+  );
+
+  const webviewProvider = new CantrikStatusWebviewProvider();
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      CantrikStatusWebviewProvider.viewId,
+      webviewProvider
+    )
+  );
+
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider(
       "cantrikSidePanel",
       new CantrikTreeProvider()
     ),
+    vscode.commands.registerCommand("cantrik.showOutput", () => {
+      cantrikOutput().show(true);
+    }),
     vscode.commands.registerCommand("cantrik.doctor", () => {
       runCantrikCapture(["doctor"], "cantrik doctor");
     }),

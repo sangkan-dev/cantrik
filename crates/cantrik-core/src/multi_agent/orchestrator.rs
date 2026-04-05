@@ -20,6 +20,8 @@ pub struct OrchestratorOptions {
     /// Skip worker LLMs and synthesis; print decomposition only.
     pub dry_run: bool,
     pub max_parallel_override: Option<usize>,
+    /// Run one extra LLM “reviewer” pass on the synthesized output.
+    pub reflect: bool,
 }
 
 #[derive(Debug, Error)]
@@ -156,6 +158,19 @@ Mention which subtasks failed and what succeeded. User goal:\n{goal}\n\nSub-resu
     llm::ask_complete_text(config, &prompt).await
 }
 
+async fn reflect_on_synthesis(
+    config: &AppConfig,
+    goal: &str,
+    synthesized: &str,
+) -> Result<String, LlmError> {
+    let prompt = format!(
+        "You are a post-orchestration reviewer (single reflection round).\n\
+List gaps, risks, and one concrete next action in 3–6 short bullets.\n\n\
+Goal:\n{goal}\n\nSynthesis:\n{synthesized}"
+    );
+    llm::ask_complete_text(config, &prompt).await
+}
+
 /// Builder stub: LLM-only note; real Builder would use `cantrik file` / `exec` with `--approve`.
 pub async fn run_builder_stub_phase(
     config: &AppConfig,
@@ -202,9 +217,20 @@ pub async fn run_orchestrated(
 
     let results = run_subtasks_parallel(config, goal, &tasks, max_parallel, summary_max).await;
     let synthesized = synthesize_results(config, goal, &results).await?;
+    let reflection = if opts.reflect {
+        Some(reflect_on_synthesis(config, goal, &synthesized).await?)
+    } else {
+        None
+    };
     let builder = run_builder_stub_phase(config, goal, &synthesized).await?;
 
-    Ok(format!(
-        "{synthesized}\n\n--- Builder (stub) ---\n{builder}"
-    ))
+    let mut out = format!("{synthesized}\n\n");
+    if let Some(r) = reflection {
+        out.push_str("--- Reflection ---\n");
+        out.push_str(&r);
+        out.push_str("\n\n");
+    }
+    out.push_str("--- Builder (stub) ---\n");
+    out.push_str(&builder);
+    Ok(out)
 }

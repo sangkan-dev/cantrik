@@ -4,7 +4,7 @@ members = [
 	"crates/cantrik-core",
 ]
 # Standalone helper; keep out of the main workspace lockfile.
-exclude = ["apps/cantrik-tray"]
+exclude = ["apps/cantrik-tray", "apps/cantrik-tauri/src-tauri"]
 resolver = "2"
 
 [workspace.package]

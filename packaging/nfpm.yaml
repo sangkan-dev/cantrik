@@ -1,5 +1,5 @@
 # nfpm (https://nfpm.goreleaser.com/) — build a .deb after release binary exists:
-#   cargo build --release -p cantrik
+#   cargo build --release -p cantrik-cli
 #   VERSION=0.1.0 nfpm pkg --config packaging/nfpm.yaml --packager deb
 # Adjust `arch` (amd64, arm64) to match the built binary.
 name: cantrik

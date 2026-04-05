@@ -26,6 +26,11 @@
         {
           "id": "cantrikSidePanel",
           "name": "Commands & links"
+        },
+        {
+          "type": "webview",
+          "id": "cantrikStatusWebview",
+          "name": "Status & registry"
         }
       ]
     },
@@ -57,6 +62,10 @@
       {
         "command": "cantrik.openRepo",
         "title": "Cantrik: Open GitHub repository"
+      },
+      {
+        "command": "cantrik.showOutput",
+        "title": "Cantrik: Show output channel"
       }
     ]
   },

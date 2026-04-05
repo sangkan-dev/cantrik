@@ -9,7 +9,10 @@ use thiserror::Error;
 
 use crate::audit;
 use crate::checkpoint;
-use crate::config::{AppConfig, effective_sandbox_level, provenance_file_enabled};
+use crate::config::{
+    AppConfig, effective_sandbox_level, offline_blocks_outbound_http, offline_http_blocked_message,
+    provenance_file_enabled,
+};
 use crate::plugins::{lua_runtime, wasm_runtime};
 use crate::provenance;
 use crate::tools::{ToolError as FileToolError, read_file_capped};
@@ -47,6 +50,15 @@ pub enum ToolSystemError {
 fn require_not_forbidden(config: &AppConfig, tool: ToolId) -> Result<(), ToolSystemError> {
     if effective_tier(config, tool) == PermissionTier::Forbidden {
         return Err(ToolSystemError::Forbidden(tool));
+    }
+    Ok(())
+}
+
+fn require_outbound_http_when_not_offline(config: &AppConfig) -> Result<(), ToolSystemError> {
+    if offline_blocks_outbound_http(config) {
+        return Err(ToolSystemError::Policy(
+            offline_http_blocked_message().to_string(),
+        ));
     }
     Ok(())
 }
@@ -247,6 +259,7 @@ pub async fn tool_web_fetch(
     approval: NetworkApproval,
 ) -> Result<Vec<u8>, ToolSystemError> {
     require_not_forbidden(config, ToolId::WebFetch)?;
+    require_outbound_http_when_not_offline(config)?;
     let body = http_get_capped(url, max_bytes).await?;
     let line = audit::format_fetch_audit(url, body.len());
     let _ = audit::append_audit_line(line.trim_end());
@@ -262,6 +275,7 @@ pub async fn tool_browse_page(
     approval: NetworkApproval,
 ) -> Result<Vec<u8>, ToolSystemError> {
     require_not_forbidden(config, ToolId::BrowsePage)?;
+    require_outbound_http_when_not_offline(config)?;
     let body = http_get_capped(url, max_bytes).await?;
     let line = audit::format_fetch_audit(url, body.len());
     let _ = audit::append_audit_line(line.trim_end());
@@ -277,6 +291,7 @@ pub async fn tool_fetch_docs(
     approval: NetworkApproval,
 ) -> Result<Vec<u8>, ToolSystemError> {
     require_not_forbidden(config, ToolId::FetchDocs)?;
+    require_outbound_http_when_not_offline(config)?;
     let body = http_get_capped(url, max_bytes).await?;
     let line = audit::format_fetch_audit(url, body.len());
     let _ = audit::append_audit_line(line.trim_end());
@@ -320,6 +335,7 @@ pub async fn tool_web_search(
     approval: NetworkApproval,
 ) -> Result<String, ToolSystemError> {
     require_not_forbidden(config, ToolId::WebSearch)?;
+    require_outbound_http_when_not_offline(config)?;
     let _ = approval;
     let mut u = Url::parse("https://html.duckduckgo.com/html/")
         .map_err(|e| ToolSystemError::Http(e.to_string()))?;
@@ -333,7 +349,23 @@ pub async fn tool_web_search(
 mod tests {
     use super::*;
     use crate::config::AppConfig;
+    use crate::tool_system::approvals::NetworkApproval;
     use crate::tool_system::{ExecApproval, ToolId};
+
+    #[tokio::test]
+    async fn web_fetch_refused_when_offline() {
+        let mut c = AppConfig::default();
+        c.llm.offline = Some(true);
+        let err = tool_web_fetch(
+            &c,
+            "https://example.com/",
+            1024,
+            NetworkApproval::user_approved_network(),
+        )
+        .await
+        .expect_err("offline should block");
+        assert!(matches!(err, ToolSystemError::Policy(_)));
+    }
 
     #[test]
     fn ddg_format_extracts_links() {

@@ -18,6 +18,7 @@ pub struct HealthCli {
     pub tree: bool,
     pub outdated: bool,
     pub coverage: bool,
+    pub deny: bool,
 }
 
 pub struct HealthReport {
@@ -194,6 +195,22 @@ pub async fn run_report(cwd: &Path, config: &AppConfig, cli: &HealthCli) -> Heal
             "--summary-only".into(),
         ];
         steps.push(run_step(cwd, "llvm-cov summary", &cov, t).await);
+    }
+
+    if cli.deny {
+        let probe = vec!["cargo".into(), "deny".into(), "--version".into()];
+        let can = run_argv(cwd, &probe, std::cmp::min(15, t)).await;
+        let run_deny = matches!(&can, Ok(o) if o.status.success());
+        if run_deny {
+            let deny_argv = vec!["cargo".into(), "deny".into(), "check".into()];
+            steps.push(run_step(cwd, "cargo deny", &deny_argv, t).await);
+        } else {
+            steps.push(StepResult {
+                name: "cargo deny",
+                ok: true,
+                detail: "skipped: install cargo-deny (`cargo install cargo-deny`); add deny.toml for policy".into(),
+            });
+        }
     }
 
     let mut any_fail = false;

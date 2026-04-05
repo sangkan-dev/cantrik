@@ -351,6 +351,7 @@ fn handle_line(
                     tree: false,
                     outdated: false,
                     coverage: false,
+                    deny: false,
                 };
                 let rep = rt.block_on(health::run_report(cwd, config, &cli));
                 for l in rep.lines {
@@ -377,6 +378,7 @@ fn handle_line(
                     goal_s,
                     false,
                     None,
+                    false,
                 ));
                 state.busy = false;
                 if code == ExitCode::SUCCESS {

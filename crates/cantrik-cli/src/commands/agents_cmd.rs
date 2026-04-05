@@ -10,6 +10,7 @@ pub(crate) async fn run(
     goal: &str,
     dry_run: bool,
     max_parallel: Option<usize>,
+    reflect: bool,
 ) -> ExitCode {
     if goal.trim().is_empty() {
         eprintln!("agents: empty goal");
@@ -20,6 +21,7 @@ pub(crate) async fn run(
         depth: 0,
         dry_run,
         max_parallel_override: max_parallel,
+        reflect,
     };
 
     match run_orchestrated(config, goal.trim(), opts).await {

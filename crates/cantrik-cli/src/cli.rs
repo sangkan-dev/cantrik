@@ -78,6 +78,9 @@ pub enum Command {
         dry_run: bool,
         #[arg(long, value_name = "N")]
         max_parallel: Option<usize>,
+        /// Extra LLM reflection round on the synthesized multi-agent result.
+        #[arg(long)]
+        reflect: bool,
         #[arg(required = true, trailing_var_arg = true, value_name = "GOAL")]
         goal: Vec<String>,
     },
@@ -291,6 +294,9 @@ pub enum Command {
         /// Execute the fetch step (`--fetch` implied). Without this, only prints the recipe.
         #[arg(long)]
         approve: bool,
+        /// After a successful fetch, run `cantrik agents` with a structured goal (requires `--approve` and `--fetch`).
+        #[arg(long)]
+        run_agents: bool,
     },
     /// Web search / fetch with explicit `--approve` (Sprint 16, PRD §4.13).
     Web {
@@ -350,6 +356,9 @@ pub enum Command {
         /// Include `cargo llvm-cov report --workspace --summary-only` (requires `cargo install cargo-llvm-cov` + llvm-tools).
         #[arg(long)]
         coverage: bool,
+        /// Include `cargo deny check` (requires `cargo install cargo-deny` and a `deny.toml` in the project).
+        #[arg(long)]
+        deny: bool,
     },
     /// Print shell completions to stdout (write to a file or source from your shell).
     Completions {

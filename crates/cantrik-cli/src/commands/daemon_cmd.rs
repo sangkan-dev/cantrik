@@ -162,7 +162,7 @@ async fn run_one_job(pool: &SqlitePool, job: BackgroundJob) -> Result<(), Backgr
         let hint = format!("cantrik background resume {}", job.id);
         update_job_state(pool, &job.id, JobState::WaitingApproval, None, Some(&hint)).await?;
         let ch = notification_channels_from_config(&config.background, job.notify_on_approval);
-        notify_approval_needed(&job.id, &hint, &ch).await;
+        notify_approval_needed(&job.id, &hint, &ch, &config).await;
     }
 
     Ok(())

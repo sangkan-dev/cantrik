@@ -576,7 +576,8 @@ pub fn effective_llm_offline(c: &LlmConfig) -> bool {
     c.offline.unwrap_or(false)
 }
 
-/// When offline mode is on, outbound HTTP CLI tools (`fetch`, `web`, …) should refuse (enterprise audit).
+/// When offline mode is on, outbound HTTP CLI tools (`fetch`, `web`, agent `web_fetch` / `browse_page`, …)
+/// and background webhooks should refuse or skip (enterprise audit).
 pub fn offline_blocks_outbound_http(app: &AppConfig) -> bool {
     effective_llm_offline(&app.llm)
 }

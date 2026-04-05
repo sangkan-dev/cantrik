@@ -1,10 +1,25 @@
-# Cantrik Tauri tray (scaffold)
+# Cantrik Tauri tray (v2 MVP)
 
-Full **Tauri v2** tray UI is tracked under backlog Phase 4 (replace or wrap [`cantrik-tray`](../cantrik-tray/)).
+System tray app with **Quit** only; the main window stays hidden. Use this when you want a native tray entry without the separate [`cantrik-tray`](../cantrik-tray/) notifier.
 
-Until then:
+## Build
 
-1. Run the lightweight notifier: `cd ../cantrik-tray && cargo run` (polls `~/.local/share/cantrik/approval-pending.flag`).
-2. To scaffold Tauri here: install [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), then `npm create tauri-app@latest` in an empty subfolder and port the same polling + `notify-rust` logic into `setup()` with a tray icon.
+Prerequisites: [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) (Rust, Node, system webview libraries).
 
-Reuse the default approval flag path from [`crates/cantrik-core/src/background/mod.rs`](../../crates/cantrik-core/src/background/mod.rs) (`notification_channels_from_config`).
+```bash
+cd apps/cantrik-tauri
+npm install
+npm run build          # frontend → dist/
+cd src-tauri && cargo build   # or from repo root: same, after npm run build
+```
+
+Full bundle:
+
+```bash
+cd apps/cantrik-tauri
+npm run tauri build
+```
+
+The Rust crate lives under `src-tauri/` and is listed in the root workspace **`exclude`** so it keeps its own `Cargo.lock`.
+
+Approval notifications for background jobs still use the paths from [`crates/cantrik-core/src/background/mod.rs`](../../crates/cantrik-core/src/background/mod.rs) (`notification_channels_from_config`); this tray app does not poll flags yet—that remains the role of `cantrik-tray` until wired here.

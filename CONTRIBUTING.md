@@ -43,7 +43,11 @@ Use this as a checklist when hardening or documenting deployments—not every pa
 | `cantrik fetch`, `cantrik web` | `reqwest` after `--approve` | **Blocked** when offline mode is on. |
 | Indexing / embeddings | Ollama (and LanceDB local) | Point Ollama at loopback for fully local embeddings. |
 | MCP client | Child stdio / configured servers | May reach network depending on server; review `providers.toml` / MCP config. |
-| Background jobs + webhooks | Optional HTTP POST | `[background].webhook_url`. |
+| `cantrik mcp call` | Spawns MCP server process; tools may use network | Same as MCP — audit each `[[mcp_client.servers]]` entry. |
+| Background jobs + webhooks | Optional HTTP POST | `[background].webhook_url` when a job enters `waiting_approval` (skipped when offline mode is on). |
+| Git workflow / PR | `gh` or HTTPS to GitHub | `cantrik pr`, `workspace branch`, etc.; uses network when not `none`. |
+| Browse / fetch docs tools | HTTP when agent uses `browse_page` / `fetch_docs` / `web_search` | Refused when `[llm].offline` / `CANTRIK_OFFLINE` (same as `cantrik fetch` / `web`). |
+| Voice (`cantrik listen`) | POST to local Ollama `/api/transcribe` | Usually loopback; still HTTP. |
 | Plugins (Lua/WASM) | Sandboxed but can expose tools | Review plugin code and capabilities. |
 
 ### Phase 5 triage (contributors)
@@ -51,7 +55,8 @@ Use this as a checklist when hardening or documenting deployments—not every pa
 - **Tree-sitter:** menambah bahasa = dependency baru di `crates/cantrik-core/Cargo.toml` + wiring indexer (satu bahasa per PR).
 - **Sandbox enterprise (gVisor / Firecracker):** titik masuk ada di `crates/cantrik-core/src/tool_system/sandbox.rs`; butuh desain admin + CI khusus.
 - **Hybrid SSH / cloud executor:** belum diimplementasi — wajib desain keamanan + flag eksplisit sebelum kode produksi.
-- **Benchmark SWE-bench / Terminal-Bench:** skrip baseline [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh) (quality gates saja); harness metrik menyusul.
+- **Benchmark SWE-bench / Terminal-Bench:** skrip baseline [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh) (quality gates + hook `CANTRIK_BENCH_HARNESS=1`); demo alur terbatas [`scripts/swe-fix-demo.sh`](scripts/swe-fix-demo.sh) dengan `ISSUE_URL=…`.
+- **`cantrik fix` / agents:** `cantrik fix URL --approve --fetch --run-agents` merantai fetch + orchestrator; `cantrik agents "…" --reflect` menambah satu putaran “reviewer” LLM setelah sintesis.
 
 ---
 

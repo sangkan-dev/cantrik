@@ -196,6 +196,7 @@ pub async fn run() -> ExitCode {
             issue_url,
             fetch,
             approve,
+            run_agents,
         }) => {
             let config = match load_merged_config(&cwd) {
                 Ok(c) => c,
@@ -204,7 +205,15 @@ pub async fn run() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-            commands::fix_cmd::run(&cwd, &config, issue_url, *fetch, *approve).await
+            commands::fix_cmd::run(
+                &cwd,
+                &config,
+                issue_url,
+                *fetch,
+                *approve,
+                *run_agents,
+            )
+            .await
         }
         Some(Command::Web { sub }) => commands::web_cmd::run(&cwd, sub).await,
         Some(Command::Visualize { mode, output }) => {
@@ -237,6 +246,7 @@ pub async fn run() -> ExitCode {
             tree,
             outdated,
             coverage,
+            deny,
         }) => {
             commands::health::run(
                 &cwd,
@@ -248,6 +258,7 @@ pub async fn run() -> ExitCode {
                     tree: *tree,
                     outdated: *outdated,
                     coverage: *coverage,
+                    deny: *deny,
                 },
             )
             .await
@@ -288,6 +299,7 @@ pub async fn run() -> ExitCode {
         Some(Command::Agents {
             dry_run,
             max_parallel,
+            reflect,
             goal,
         }) => {
             let config = match load_merged_config(&cwd) {
@@ -298,7 +310,15 @@ pub async fn run() -> ExitCode {
                 }
             };
             let g = words_to_line(goal);
-            return commands::agents_cmd::run(&config, &cwd, &g, *dry_run, *max_parallel).await;
+            return commands::agents_cmd::run(
+                &config,
+                &cwd,
+                &g,
+                *dry_run,
+                *max_parallel,
+                *reflect,
+            )
+            .await;
         }
         Some(Command::Session { sub }) => match sub {
             SessionCommand::List => commands::session_cmd::list_cmd(&cwd).await,
@@ -628,6 +648,7 @@ mod tests {
             "--tree",
             "--outdated",
             "--coverage",
+            "--deny",
         ])
         .expect("parse");
         match cli.cmd.expect("cmd") {
@@ -639,6 +660,7 @@ mod tests {
                 tree,
                 outdated,
                 coverage,
+                deny,
             } => {
                 assert!(soft);
                 assert!(no_clippy);
@@ -647,6 +669,7 @@ mod tests {
                 assert!(tree);
                 assert!(outdated);
                 assert!(coverage);
+                assert!(deny);
             }
             _ => panic!("expected health"),
         }
@@ -788,6 +811,7 @@ mod tests {
             "https://github.com/a/b/issues/1",
             "--fetch",
             "--approve",
+            "--run-agents",
         ])
         .expect("parse");
         match cli.cmd.expect("cmd") {
@@ -795,10 +819,12 @@ mod tests {
                 issue_url,
                 fetch,
                 approve,
+                run_agents,
             } => {
                 assert!(issue_url.contains("issues/1"));
                 assert!(fetch);
                 assert!(approve);
+                assert!(run_agents);
             }
             _ => panic!("expected fix"),
         }

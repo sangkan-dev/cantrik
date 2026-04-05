@@ -1,5 +1,5 @@
 {
-  description = "Cantrik dev shell (Rust + protoc).";
+  description = "Cantrik: Nix dev shell (Rust + protoc). Packaged binary via nixpkgs is deferred; see README.md in this directory.";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 

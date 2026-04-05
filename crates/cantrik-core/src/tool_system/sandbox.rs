@@ -1,4 +1,7 @@
 //! Wrap `run_command` in bubblewrap (Linux) or pass-through with macOS notes.
+//!
+//! Enterprise backlog: stronger isolation (gVisor runsc, Firecracker) should stay behind admin-only
+//! config and feature flags; bubblewrap remains the default portable path.
 
 use std::ffi::OsString;
 use std::path::Path;

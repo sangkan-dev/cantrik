@@ -38,3 +38,18 @@ jobs:
 
       - name: Cargo test
         run: cargo test --workspace --all-targets
+
+  packaging-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Winget manifest parses as YAML
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-yaml
+          python3 -c "import yaml; yaml.safe_load(open('packaging/winget/Sangkan.Cantrik.yaml'))"
+
+      - name: PKGBUILD references cantrik-cli package
+        run: grep -q 'cantrik-cli' packaging/arch/PKGBUILD

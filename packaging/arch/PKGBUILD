@@ -1,4 +1,6 @@
-# Maintainer: community — bump pkgver to match release tag.
+# Maintainer: community — bump pkgver/pkgrel to match release tag.
+# After a tag exists, replace sha256sums with output of: curl -sL URL | sha256sum
+# (or run `updpkgsums` in this directory). SKIP is valid for local iteration only.
 pkgname=cantrik
 pkgver=0.1.0
 pkgrel=1
@@ -20,7 +22,7 @@ prepare() {
 build() {
   cd "$pkgname-$pkgver"
   export PROTOC=/usr/bin/protoc
-  cargo build --release --locked -p cantrik
+  cargo build --release --locked -p cantrik-cli
 }
 
 package() {

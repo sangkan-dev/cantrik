@@ -22,7 +22,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build release
-        run: cargo build --release -p cantrik
+        run: cargo build --release -p cantrik-cli
 
       - name: Upload artifact
         uses: softprops/action-gh-release@v2

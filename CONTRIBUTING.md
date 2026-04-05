@@ -78,6 +78,12 @@ Untuk menambah entri di [`apps/cantrik-site/static/registry/recipes.json`](apps/
 
 **Kurasi editorial (maintainer):** merge ke registry utama hanya oleh maintainer `sangkan-dev/cantrik` setelah review PR. Tolak atau minta revisi jika: spam / promosi, duplikat `id` atau overlap besar dengan entri ada, `init_template` tidak cocok template [`cantrik init`](crates/cantrik-cli/), atau konten menyesatkan. Field opsional boolean `verified: true` hanya boleh ditambahkan maintainer setelah entri diuji (template init berjalan sesuai deskripsi); kontributor umum tidak perlu mengisi `verified`.
 
+### Dokumentasi pengguna (cantrik-site)
+
+- **URL kanonik:** dokumentasi ramai pengguna dipublikasikan di **`https://cantrik.sangkan.dev/docs`** (sumber konten: [`apps/cantrik-site/src/routes/docs/`](apps/cantrik-site/src/routes/docs/), halaman SvelteKit + `+page.svelte`).
+- **Gaya konten:** kalimat pendek, TL;DR + kotak “Kenapa?” bila membantu; klaim fitur harus selaras dengan CLI/PRD (`cantrik --help` dan [`prd/cantrik-prd.md`](prd/cantrik-prd.md)).
+- **PR kecil** satu tema (satu halaman atau satu alur nav) memudahkan review.
+
 ### Enterprise sandbox (gVisor / runsc)
 
 - Set `sandbox.level = "container"` **hanya** jika operator siap: butuh biner `runsc` dan kebijakan host.

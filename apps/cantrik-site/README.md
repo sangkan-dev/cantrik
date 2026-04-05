@@ -15,3 +15,7 @@ npm run build
 Production files are written to `build/`. Plugin list MVP: `static/registry/plugins.json`.
 
 See also [`../README.md`](../README.md) for monorepo layout.
+
+## Backlog signature (opsional)
+
+Rencana peningkatan visual/animasi berat (mis. **GSAP** + ScrambleText, **Three.js / Threlte** + shader CRT) **belum** termasuk dependency saat ini. Jika ditambahkan nanti: lazy-load per rute, ukur ukuran bundle (`npm run build`), pastikan fallback tanpa JS, hormati `prefers-reduced-motion`, dan catat dampak lisensi/build di PR review.

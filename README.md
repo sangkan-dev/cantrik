@@ -20,7 +20,7 @@ cantrik
 
 ### Community & hub
 
-- **Website (placeholder docs + plugin registry MVP):** [apps/cantrik-site](apps/cantrik-site/) — deploy to **`https://cantrik.sangkan.dev`**. PRD also mentions `cantrik.dev` as a possible alias/redirect.
+- **Website (hub + dokumentasi pengguna + plugin registry MVP):** [apps/cantrik-site](apps/cantrik-site/) — deploy to **`https://cantrik.sangkan.dev`**. **Dokumentasi pengguna mulai dari `https://cantrik.sangkan.dev/docs`.** PRD also mentions `cantrik.dev` as a possible alias/redirect.
 - **Pre-built CLI:** Linux x86_64 binary attached to [GitHub Releases](https://github.com/sangkan-dev/cantrik/releases) when you push a version tag `v*` (see `.github/workflows/release.yml`).
 - **Packaging:** [Homebrew](packaging/homebrew/cantrik.rb), [nfpm `.deb`](packaging/nfpm.yaml), [Arch `PKGBUILD`](packaging/arch/PKGBUILD), [Nix dev shell](packaging/nix/flake.nix), [Winget manifest](packaging/winget/Sangkan.Cantrik.yaml) (update `InstallerSha256` per release).
 

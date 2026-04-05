@@ -32,14 +32,14 @@
 						{#if r.verified}
 							<span
 								class="ml-2 rounded bg-gold-dim/20 px-1.5 py-0.5 text-xs font-normal text-gold"
-								title="Checked by maintainers (see CONTRIBUTING § Registry recipes)"
-								>verified</span
+								title="Checked by maintainers (see CONTRIBUTING § Registry recipes)">verified</span
 							>
 						{/if}
 					</p>
 					<p class="mt-1 text-ash">{r.description}</p>
 					<p class="mt-2 text-smoke">
-						<span class="text-gold-dim">id</span> {r.id} ·
+						<span class="text-gold-dim">id</span>
+						{r.id} ·
 						<span class="text-gold-dim">init</span>
 						<code class="text-gold">cantrik init --template {r.init_template}</code>
 					</p>

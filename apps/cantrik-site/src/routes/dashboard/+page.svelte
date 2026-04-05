@@ -88,25 +88,31 @@
 			<a class="text-gold hover:text-gold-bright" href={resolve('/registry')}>Plugin registry</a>
 		</li>
 		<li>
-			<a class="text-gold hover:text-gold-bright" href={resolve('/registry/recipes')}>Recipe registry</a>
+			<a class="text-gold hover:text-gold-bright" href={resolve('/registry/recipes')}
+				>Recipe registry</a
+			>
 			— <code class="text-gold-dim">/registry/recipes.json</code>
 		</li>
 		<li>Multi-agent reviewer: <code class="text-gold-dim">cantrik agents "..." --reflect</code></li>
 		<li>
-			<a class="text-gold hover:text-gold-bright" href={resolve('/docs/agent-harness')}>Agent harness</a>
+			<a class="text-gold hover:text-gold-bright" href={resolve('/docs/agent-harness')}
+				>Agent harness</a
+			>
 			— docs for harness summaries and re-plan.
 		</li>
 	</ul>
 
 	<section class="mt-12 rounded border border-andesite-lighter bg-andesite-light p-4">
-		<h2 class="font-heading text-lg font-medium text-gold-bright">Parse status JSON (browser-only)</h2>
+		<h2 class="font-heading text-lg font-medium text-gold-bright">
+			Parse status JSON (browser-only)
+		</h2>
 		<p class="mt-2 font-mono text-xs leading-relaxed text-smoke">
-			Paste output of <code class="text-gold-dim">cantrik status --json</code>. Nothing is uploaded; parsing runs
-			only in this tab.
+			Paste output of <code class="text-gold-dim">cantrik status --json</code>. Nothing is uploaded;
+			parsing runs only in this tab.
 		</p>
 		<textarea
 			bind:value={paste}
-			class="mt-3 h-40 w-full resize-y rounded border border-andesite-lighter bg-obsidian px-3 py-2 font-mono text-xs text-ash"
+			class="bg-obsidian mt-3 h-40 w-full resize-y rounded border border-andesite-lighter px-3 py-2 font-mono text-xs text-ash"
 			placeholder="Paste output of cantrik status --json (object with sessions, jobs, …)"
 			spellcheck="false"
 		></textarea>
@@ -121,15 +127,18 @@
 			<p class="mt-3 font-mono text-sm text-red-400/90">{parseError}</p>
 		{/if}
 		{#if summary}
-			<pre class="mt-3 whitespace-pre-wrap font-mono text-xs leading-relaxed text-ash">{summary}</pre>
+			<pre
+				class="mt-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-ash">{summary}</pre>
 		{/if}
 	</section>
 
 	<section class="mt-10 rounded border border-andesite-lighter bg-andesite-light p-4">
-		<h2 class="font-heading text-lg font-medium text-gold-bright">Load harness summary (local file)</h2>
+		<h2 class="font-heading text-lg font-medium text-gold-bright">
+			Load harness summary (local file)
+		</h2>
 		<p class="mt-2 font-mono text-xs leading-relaxed text-smoke">
-			Choose <code class="text-gold-dim">.cantrik/session-harness-summary.json</code> from disk. The file never leaves
-			your browser.
+			Choose <code class="text-gold-dim">.cantrik/session-harness-summary.json</code> from disk. The file
+			never leaves your browser.
 		</p>
 		<input
 			type="file"
@@ -141,7 +150,8 @@
 			<p class="mt-3 font-mono text-sm text-red-400/90">{harnessError}</p>
 		{/if}
 		{#if harnessSummary}
-			<pre class="mt-3 whitespace-pre-wrap font-mono text-xs leading-relaxed text-ash">{harnessSummary}</pre>
+			<pre
+				class="mt-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-ash">{harnessSummary}</pre>
 		{/if}
 	</section>
 

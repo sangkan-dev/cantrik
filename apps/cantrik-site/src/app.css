@@ -115,6 +115,12 @@ html {
 	scroll-behavior: smooth;
 }
 
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+}
+
 body {
 	background-color: #0d0d0d;
 	color: #e0e0e0;

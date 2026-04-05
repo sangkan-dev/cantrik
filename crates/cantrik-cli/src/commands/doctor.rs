@@ -97,12 +97,11 @@ pub(crate) fn report_lines(cwd: &Path) -> Vec<String> {
         Err(error) => lines.push(format!("  config load: FAILED — {error}")),
     }
 
-    match tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(rt) => {
-            let line = match rt.block_on(cantrik_core::search::table_row_count(cwd)) {
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) => {
+            let line = match tokio::task::block_in_place(|| {
+                handle.block_on(cantrik_core::search::table_row_count(cwd))
+            }) {
                 Ok(None) => "  lance vector index: none (under .cantrik/index/lance/)".to_string(),
                 Ok(Some(n)) => {
                     format!("  lance vector index: {n} rows (table `code_chunks`)")
@@ -111,7 +110,7 @@ pub(crate) fn report_lines(cwd: &Path) -> Vec<String> {
             };
             lines.push(line);
         }
-        Err(e) => lines.push(format!("  lance vector index: runtime error ({e})")),
+        Err(_) => lines.push("  lance vector index: no tokio runtime".to_string()),
     }
 
     lines

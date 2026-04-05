@@ -144,10 +144,12 @@ Task to plan:\n{goal}"
     let cfg = config.clone();
     let goal_owned = goal.to_string();
 
-    let outcome = run_plan_loop(&goal_owned, plan, limits, |prompt| {
-        handle
-            .block_on(session_llm::complete_with_session(&cwd_buf, &cfg, prompt))
-            .map_err(|e| PlanLoopError::Llm(e.to_string()))
+    let outcome = tokio::task::block_in_place(|| {
+        run_plan_loop(&goal_owned, plan, limits, |prompt| {
+            handle
+                .block_on(session_llm::complete_with_session(&cwd_buf, &cfg, prompt))
+                .map_err(|e| PlanLoopError::Llm(e.to_string()))
+        })
     });
 
     match &outcome {

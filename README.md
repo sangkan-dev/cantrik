@@ -32,20 +32,19 @@ cantrik init --template rust-cli
 
 ---
 
-## Status: Sprint 1 ✓ Foundation & Tooling
+## Status & Definition of Done
 
-**Current Phase:** Foundation Engineering (Multi-crate Rust workspace)
+**Sprint board & roadmap:** lihat [TASK.md](TASK.md).
 
-| Component | Status | Details |
-|-----------|--------|---------|
-| Workspace Structure | ✓ Complete | Multi-crate (core + cli), workspace dependencies |
-| Core Dependencies | ✓ Complete | tokio, clap, serde, toml, reqwest, thiserror |
-| Config System | ✓ Complete | 2-tier precedence: project > global > defaults |
-| Quality Tooling | ✓ Complete | rustfmt, clippy (-D warnings), pre-commit hooks |
-| CI/CD | ✓ Complete | GitHub Actions: fmt check, cargo check, clippy, test |
-| **Definition of Done** | [/] In Progress | Local: ✓ All green • CI: Awaiting push to trigger |
+**Verifikasi objektif vs DoD:** [DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md) · gate rilis [docs/DOD_RELEASE_GATE.md](docs/DOD_RELEASE_GATE.md) · matriks bukti [docs/DOD_VERIFICATION_MATRIX.md](docs/DOD_VERIFICATION_MATRIX.md) · ringkasan go/no-go [docs/DOD_GO_NO_GO.md](docs/DOD_GO_NO_GO.md).
 
-**Next:** Sprint 2 (CLI Scaffold & Command Surface v1)
+**Cek otomatis lokal (fmt, `cargo build --release`, clippy, test, help smoke):**
+
+```bash
+./scripts/dod-auto-smoke.sh
+```
+
+Build LanceDB membutuhkan `protoc` dan *well-known* protobuf includes (skrip mengisi `PROTOC_INCLUDE` jika ditemukan; di CI Ubuntu paket `protobuf-compiler`).
 
 ---
 

@@ -46,9 +46,7 @@ pub(crate) fn run(config: &AppConfig, cwd: &Path, approve: bool, src: &Path) -> 
         return ExitCode::FAILURE;
     };
     let Some(ref remote_dir) = config.remote_exec.sync_remote_dir else {
-        eprintln!(
-            "sync: set [remote_exec].sync_remote_dir (remote path) for rsync destination."
-        );
+        eprintln!("sync: set [remote_exec].sync_remote_dir (remote path) for rsync destination.");
         return ExitCode::FAILURE;
     };
     let remote_dir = remote_dir.trim();
@@ -99,9 +97,7 @@ pub(crate) fn run(config: &AppConfig, cwd: &Path, approve: bool, src: &Path) -> 
     if let Ok(flag) = std::env::var("CANTRIK_REMOTE_SYNC_APPROVE_FILE") {
         let flag = flag.trim();
         if !flag.is_empty() && !Path::new(flag).is_file() {
-            eprintln!(
-                "sync: CANTRIK_REMOTE_SYNC_APPROVE_FILE is set but file is missing: {flag}"
-            );
+            eprintln!("sync: CANTRIK_REMOTE_SYNC_APPROVE_FILE is set but file is missing: {flag}");
             return ExitCode::FAILURE;
         }
     }
@@ -141,13 +137,15 @@ mod tests {
 
     #[test]
     fn sync_requires_remote_dir() {
-        let mut cfg = AppConfig::default();
-        cfg.remote_exec = RemoteExecConfig {
-            host: Some("h".into()),
-            user: Some("u".into()),
-            identity_file: None,
-            extra_ssh_args: vec![],
-            sync_remote_dir: None,
+        let cfg = AppConfig {
+            remote_exec: RemoteExecConfig {
+                host: Some("h".into()),
+                user: Some("u".into()),
+                identity_file: None,
+                extra_ssh_args: vec![],
+                sync_remote_dir: None,
+            },
+            ..Default::default()
         };
         let cwd = std::env::current_dir().unwrap();
         let code = run(&cfg, &cwd, false, Path::new("."));
@@ -156,13 +154,15 @@ mod tests {
 
     #[test]
     fn sync_approve_requires_flag_file_when_env_set() {
-        let mut cfg = AppConfig::default();
-        cfg.remote_exec = RemoteExecConfig {
-            host: Some("h.example.com".into()),
-            user: Some("u".into()),
-            identity_file: None,
-            extra_ssh_args: vec![],
-            sync_remote_dir: Some("/tmp/remote".into()),
+        let cfg = AppConfig {
+            remote_exec: RemoteExecConfig {
+                host: Some("h.example.com".into()),
+                user: Some("u".into()),
+                identity_file: None,
+                extra_ssh_args: vec![],
+                sync_remote_dir: Some("/tmp/remote".into()),
+            },
+            ..Default::default()
         };
         let missing_flag = std::env::temp_dir().join("cantrik_sync_flag_missing_test_xyz");
         // SAFETY: test mutates process environment; no other threads read this var here.
@@ -182,13 +182,15 @@ mod tests {
 
     #[test]
     fn sync_dry_run_ok_without_spawning_rsync() {
-        let mut cfg = AppConfig::default();
-        cfg.remote_exec = RemoteExecConfig {
-            host: Some("build.example.com".into()),
-            user: Some("builder".into()),
-            identity_file: None,
-            extra_ssh_args: vec![],
-            sync_remote_dir: Some("/home/builder/app".into()),
+        let cfg = AppConfig {
+            remote_exec: RemoteExecConfig {
+                host: Some("build.example.com".into()),
+                user: Some("builder".into()),
+                identity_file: None,
+                extra_ssh_args: vec![],
+                sync_remote_dir: Some("/home/builder/app".into()),
+            },
+            ..Default::default()
         };
         let cwd = std::env::temp_dir();
         let code = run(&cfg, &cwd, false, Path::new("."));

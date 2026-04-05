@@ -206,9 +206,7 @@ mod fetch_integration {
         let location = format!("{}{final_path}", srv.uri());
         Mock::given(method("GET"))
             .and(path("/issues/entry"))
-            .respond_with(
-                ResponseTemplate::new(302).insert_header("Location", location.as_str()),
-            )
+            .respond_with(ResponseTemplate::new(302).insert_header("Location", location.as_str()))
             .mount(&srv)
             .await;
         Mock::given(method("GET"))

@@ -357,6 +357,8 @@ default_model = "llama-3.3-70b-versatile"
 - [x] Adaptive Begawan MVP — tabel `approval_memory`, rekam `--approve` (file/exec/experiment), injeksi prompt + toggle `[memory] adaptive_begawan`
  
 **Batas MVP (Sprint 19):** Hub = landing + nav docs/registry; plugin list = `static/registry/plugins.json`; CI terpisah untuk site; tidak ada marketplace atau auth. Init = 2 template saja. Rilis = satu artefak `cantrik` (Linux) per tag; verifikasi checksum manual sampai ada signing otomatis.
+
+**DoD gap (audit):** [DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md) Phase 4 mensyaratkan binary GitHub Releases untuk Linux x86_64/aarch64 + macOS x86_64/aarch64; [`.github/workflows/release.yml`](.github/workflows/release.yml) saat ini hanya Linux x86_64. Untuk gate **GA** ketat, perlu perluasan matrix atau penyesuaian DoD — lihat [docs/DOD_VERIFICATION_MATRIX.md](docs/DOD_VERIFICATION_MATRIX.md).
  
 **Definition of Done:** Rilis alpha publik + dokumentasi kontribusi + salah satu saluran distribusi utama aktif.
  
@@ -425,9 +427,24 @@ default_model = "llama-3.3-70b-versatile"
   - [x] Dokumen arah micro-VM / gate PR: [`docs/runsc-microvm-roadmap.md`](docs/runsc-microvm-roadmap.md). **Ditunda:** micro-VM penuh / gate runsc pada setiap PR wajib.
  
 ---
- 
+
+## Verifikasi Definition of Done (DoD)
+
+Checklist hukum produk ada di [DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md). Sprint yang bertanda `[x]` boleh masih punya **Batas MVP** yang tidak sama dengan MUST DoD ketat.
+
+| Artefak | Fungsi |
+|---------|--------|
+| [docs/DOD_RELEASE_GATE.md](docs/DOD_RELEASE_GATE.md) | Gate Alpha / Beta / GA — MUST mana yang wajib PASS sebelum rilis |
+| [docs/DOD_VERIFICATION_MATRIX.md](docs/DOD_VERIFICATION_MATRIX.md) | Matriks PASS / PARTIAL / FAIL + bukti (perintah, path kode) |
+| [docs/DOD_GO_NO_GO.md](docs/DOD_GO_NO_GO.md) | Ringkasan blocking vs non-blocking (diperbarui tiap audit) |
+| `./scripts/dod-auto-smoke.sh` | fmt, `cargo build --release -p cantrik-cli`, clippy, test, smoke `--help` |
+
+**Jika audit DoD menemukan MUST FAIL** pada fase yang menjadi gate rilis: turunkan checkbox sprint terkait ke `[/]` atau tambahkan sub-bullet *DoD gap* di sprint itu agar board tidak menyesatkan.
+
+---
+
 ## Catatan Operasional
- 
+
 - Update status tiap PR: `[ ]` → `[/]` → `[x]`.
 - Satu sprint boleh beberapa PR kecil.
 - Jika scope sprint meleset >30%, pindahkan item ke sprint berikutnya dan catat alasan singkat di PR atau di bawah item bersangkutan.

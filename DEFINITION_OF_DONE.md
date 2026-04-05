@@ -7,6 +7,9 @@ manapun hanya dengan membaca kode dan menjalankan perintah.
 Reviewer dapat menggunakan dokumen ini bersama `prd/cantrik-prd.md` dan `TASK.md`
 sebagai referensi utama.
 
+**Gate rilis & matriks audit:** lihat `docs/DOD_RELEASE_GATE.md`, `docs/DOD_VERIFICATION_MATRIX.md`,
+`docs/DOD_GO_NO_GO.md`, dan skrip `./scripts/dod-auto-smoke.sh`.
+
 ---
 
 ## Cara Menggunakan Dokumen Ini
@@ -27,7 +30,7 @@ sebagai referensi utama.
 - `[AUTO]` `cargo clippy -- -D warnings` zero warning
 - `[AUTO]` `cargo fmt --check` tidak ada perubahan formatting
 - `[AUTO]` CI GitHub Actions hijau untuk semua job (build, test, clippy, fmt) di push ke `main`
-- `[MANUAL]` Workspace multi-crate terdefinisi di root `Cargo.toml` dengan crate minimal: `cantrik-cli`, `cantrik-core`, `cantrik-llm`
+- `[MANUAL]` Workspace multi-crate terdefinisi di root `Cargo.toml` dengan crate minimal: `cantrik-cli`, `cantrik-core`, serta **substansi LLM** (boleh berupa crate terpisah `cantrik-llm` atau modul di `cantrik-core`, mis. `crates/cantrik-core/src/llm/`)
 
 ### Config System `MUST`
 - `[AUTO]` `cantrik doctor` berjalan tanpa panic
@@ -188,19 +191,19 @@ sebagai referensi utama.
 ## Phase 4 — Ecosystem
 
 ### Distribusi `MUST`
-- `[AUTO]` `cantrik --version` menampilkan versi yang konsisten dengan git tag
+- `[AUTO]` `cantrik --version` menampilkan versi yang konsisten dengan `workspace.package.version` di root `Cargo.toml` dan, saat rilis dari tag, dengan tag git `v*` (verifikasi manual: bandingkan output CLI dengan tag)
 - `[MANUAL]` Instalasi via minimal satu package manager berhasil di environment bersih: Homebrew (macOS) atau apt (Ubuntu)
 - `[MANUAL]` Binary release tersedia di GitHub Releases untuk: Linux x86_64, Linux aarch64, macOS x86_64, macOS aarch64
-- `[MANUAL]` `cantrik init --template rust-api` menghasilkan struktur project yang valid dan siap dipakai
+- `[MANUAL]` `cantrik init --template rust-cli` (atau `generic`) menghasilkan struktur project yang valid dan siap dipakai
 
 ### Dokumentasi `MUST`
 - `[MANUAL]` `README.md` berisi: deskripsi singkat, cara install, quickstart 5 menit, link ke docs lengkap
 - `[MANUAL]` `CONTRIBUTING.md` berisi: cara setup dev environment, cara run test, cara submit PR
 - `[MANUAL]` Semua public API crate memiliki rustdoc (`cargo doc --no-deps` berhasil tanpa warning)
-- `[MANUAL]` `cantrik.dev` atau GitHub Pages tersedia dengan dokumentasi minimal yang bisa diakses publik
+- `[MANUAL]` Situs dokumentasi publik tersedia (mis. `cantrik.sangkan.dev` dari `apps/cantrik-site`, atau GitHub Pages) dengan dokumentasi minimal yang bisa diakses publik
 
 ### Kualitas Kode `MUST`
-- `[AUTO]` Test coverage keseluruhan ≥ 70% untuk crate `cantrik-core`, `cantrik-llm`, `cantrik-rag`, `cantrik-tools`
+- `[AUTO]` Test coverage keseluruhan ≥ 70% untuk substansi yang setara: minimal crate `cantrik-core`, serta modul LLM / RAG / tools di dalamnya (jika belum dipecah menjadi crate `cantrik-llm`, `cantrik-rag`, `cantrik-tools` — ukur per paket yang ada, mis. `cargo llvm-cov -p cantrik-core`)
 - `[AUTO]` Zero `unsafe` block tanpa komentar justifikasi yang menjelaskan kenapa diperlukan
 - `[AUTO]` Zero `unwrap()` atau `expect()` di path production (boleh di test)
 - `[MANUAL]` Semua error menggunakan tipe error yang proper (`thiserror`), bukan `Box<dyn Error>` di API publik
@@ -287,4 +290,4 @@ dan sertakan snippet kode yang relevan sebagai bukti.
 ---
 
 *Dokumen ini adalah living document — update setiap kali ada perubahan scope di PRD.*
-*Last updated: sesuaikan dengan versi PRD yang aktif.*
+*Last updated: 2026-04-05 — penyelarasan workspace, template init, coverage, dan dokumen publik dengan struktur repo saat ini.*

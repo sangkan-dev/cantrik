@@ -453,7 +453,9 @@ mod tests {
         let src = "all:\n\t@echo hi\n\nFOO := 1\n";
         let (_, chunks) = extract_chunks("Makefile", src.as_bytes()).unwrap();
         assert!(
-            chunks.iter().any(|c| c.symbol == "all" || c.symbol == "FOO"),
+            chunks
+                .iter()
+                .any(|c| c.symbol == "all" || c.symbol == "FOO"),
             "chunks: {chunks:?}"
         );
     }
@@ -463,7 +465,9 @@ mod tests {
         let src = "object Foo {\n  def bar(): Unit = ()\n}\n";
         let (_, chunks) = extract_chunks("x.scala", src.as_bytes()).unwrap();
         assert!(
-            chunks.iter().any(|c| c.symbol == "Foo" || c.symbol == "bar"),
+            chunks
+                .iter()
+                .any(|c| c.symbol == "Foo" || c.symbol == "bar"),
             "chunks: {chunks:?}"
         );
     }

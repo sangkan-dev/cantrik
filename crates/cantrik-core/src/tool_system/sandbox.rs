@@ -3,11 +3,15 @@
 //! Enterprise backlog: stronger isolation (gVisor runsc, Firecracker) should stay behind admin-only
 //! config and feature flags; bubblewrap remains the default portable path.
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::process::Command;
 
 use crate::config::SandboxLevel;
+
+/// When `sandbox.level = "container"` and this env names a `runsc` binary, Cantrik wraps exec with
+/// `runsc run -- <program> …` (admin must ensure runsc/rootless policy fits the host).
+pub const ENV_RUNSC_BIN: &str = "CANTRIK_RUNSC_BIN";
 
 /// `CANTRIK_SANDBOX=0` disables sandbox wrapping (developer escape hatch; insecure).
 pub const ENV_DISABLE_SANDBOX: &str = "CANTRIK_SANDBOX";
@@ -35,9 +39,13 @@ pub fn command_for_exec(
 
     match level {
         SandboxLevel::Container => {
-            Err(
-                "sandbox level 'container' is reserved for future gVisor/Firecracker-style isolation (enterprise backlog); use 'restricted' (default) or 'none' (insecure) today".into(),
-            )
+            let runsc = std::env::var_os(ENV_RUNSC_BIN).filter(|s| !s.is_empty());
+            let Some(bin) = runsc else {
+                return Err(format!(
+                    "sandbox level 'container' requires {ENV_RUNSC_BIN} pointing to a runsc binary (gVisor); see CONTRIBUTING (enterprise sandbox). Otherwise use 'restricted' or 'none'"
+                ));
+            };
+            runsc_command(&bin, program, argv, &cwd)
         }
         SandboxLevel::None => Ok(direct_command(program, argv, &cwd)),
         SandboxLevel::Restricted => {
@@ -54,6 +62,29 @@ fn direct_command(program: &str, argv: &[String], cwd: &Path) -> Command {
     c.args(argv);
     c.current_dir(cwd);
     c
+}
+
+/// Minimal `runsc run -- program argv…` wrapper; namespace/bind mounts are operator responsibility.
+fn runsc_command(
+    runsc_bin: &OsStr,
+    program: &str,
+    argv: &[String],
+    cwd: &Path,
+) -> Result<Command, String> {
+    let mut c = Command::new(runsc_bin);
+    c.arg("run");
+    if let Ok(extra) = std::env::var("CANTRIK_RUNSC_RUN_ARGS") {
+        for w in extra.split_whitespace() {
+            c.arg(w);
+        }
+    }
+    c.arg("--");
+    c.arg(program);
+    for a in argv {
+        c.arg(a);
+    }
+    c.current_dir(cwd);
+    Ok(c)
 }
 
 #[cfg(target_os = "linux")]

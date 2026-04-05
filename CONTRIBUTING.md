@@ -60,6 +60,28 @@ Sebelum rilis atau deploy ke lingkungan ketat, tinjau ulang (bukan sekali jalan 
 - [ ] Embedding / Ollama: host loopback vs remote; data apa yang dikirim.
 - [ ] `CANTRIK_OFFLINE` / `[llm].offline`: sudah sesuai kebijakan untuk fetch, agent tools, dan webhook (lihat tabel di atas).
 
+**Template issue:** gunakan [Release / air-gap audit](.github/ISSUE_TEMPLATE/release_audit.md) saat menyiapkan rilis atau deploy enterprise.
+
+### Distribusi (maintainer, per tag rilis)
+
+- **pacman:** setelah tag ada, isi `sha256sums` di [`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD) dari artefak sumber (mis. `curl -sL URL | sha256sum` atau `updpkgsums`). `SKIP` hanya untuk iterasi lokal.
+- **winget:** perbarui `InstallerSha256` di [`packaging/winget/Sangkan.Cantrik.yaml`](packaging/winget/Sangkan.Cantrik.yaml) agar cocok dengan binary release; CI memvalidasi sintaks YAML ([`winget-validate`](.github/workflows/winget-validate.yml)).
+- **Nix:** derivasi `nix build` penuh belum disediakan; gunakan devShell di [`packaging/nix/README.md`](packaging/nix/README.md) + `cargo install --path crates/cantrik-cli` sampai iterasi flake khusus.
+
+### Registry recipes (komunitas)
+
+Untuk menambah entri di [`apps/cantrik-site/static/registry/recipes.json`](apps/cantrik-site/static/registry/recipes.json):
+
+1. Fork + branch, edit JSON: setiap objek di `recipes` wajib punya string non-kosong: `id`, `title`, `init_template` (dan disarankan `description`).
+2. Jalankan `python3 scripts/validate-recipes-registry.py apps/cantrik-site/static/registry/recipes.json` sebelum PR.
+3. PR kecil satu tema (satu batch recipe atau satu perubahan terkait) memudahkan review.
+
+### Enterprise sandbox (gVisor / runsc)
+
+- Set `sandbox.level = "container"` **hanya** jika operator siap: butuh biner `runsc` dan kebijakan host.
+- Set env `CANTRIK_RUNSC_BIN` ke path `runsc`. Opsional: `CANTRIK_RUNSC_RUN_ARGS` — token dipisah spasi yang disisipkan setelah `runsc run` (contoh: `--network=none` jika didukung setup Anda).
+- Tanpa env tersebut, level `container` gagal dengan pesan jelas (lebih aman daripada mengeksekusi tanpa isolasi yang dimaksud).
+
 ### Self-improvement (safe profile)
 
 Menjalankan Cantrik pada **repo Cantrik sendiri** untuk saran perbaikan:
@@ -67,6 +89,7 @@ Menjalankan Cantrik pada **repo Cantrik sendiri** untuk saran perbaikan:
 - Gunakan sandbox `restricted`, batasi token/konteks di config, jangan `--approve` massal tanpa review diff.
 - Anggap biaya API dan risiko prompt injection dari konten repo; dokumentasikan asumsi di issue/PR.
 - Otomatisasi penuh “self-rewrite” tetap di backlog hingga ada gate produk (tes, approval, rollback).
+- **Dry-run skrip:** [`scripts/self-improve-dry-run.sh`](scripts/self-improve-dry-run.sh) menjalankan satu `cantrik ask` read-only pada repo (tanpa `--approve`); gunakan sebagai langkah manual sebelum otomasi patch.
 
 ### SWE constrained workflow (manual checklist)
 
@@ -77,6 +100,10 @@ Alur terbatas untuk satu issue publik + satu repo lokal:
 3. Opsional: `--experiment` — masih membutuhkan `--approve`; menjalankan mode experiment (writes + tes + revert) — review diff sebelum commit.
 4. `cantrik pr create --approve` atau alur Git manual; tidak ada jaminan “high reliability” sampai ada tes integrasi produk.
 
+**Kebijakan / QA produk (rantai `fix`):** flag `--run-agents` / `--run-experiment` wajib dipasangkan dengan `--approve` dan `--fetch`; invariant ini dites di unit test (`fix_cmd::validate_fix_flags`). Tes integrasi jaringan penuh tetap manual / backlog hingga ada fixture otomatis.
+
+**Definisi “high reliability” (SWE otonom penuh):** lihat template issue [SWE E2E reliability](.github/ISSUE_TEMPLATE/swe_e2e_reliability.md) — minimal satu skenario E2E terotomatisasi sebelum mengklaim item backlog terkait selesai.
+
 ### Phase 5 triage (contributors)
 
 - **Tree-sitter:** lihat [`docs/tree-sitter-language-extensions.md`](docs/tree-sitter-language-extensions.md) (kompatibilitas grammar vs versi `tree-sitter` workspace); satu bahasa per PR.
@@ -84,6 +111,7 @@ Alur terbatas untuk satu issue publik + satu repo lokal:
 - **Hybrid SSH / cloud executor:** RFC [`docs/rfc-hybrid-ssh-executor.md`](docs/rfc-hybrid-ssh-executor.md); implementasi setelah threat model disetujui.
 - **Benchmark SWE-bench / Terminal-Bench:** skrip baseline [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh) (quality gates + hook `CANTRIK_BENCH_HARNESS=1`); demo alur terbatas [`scripts/swe-fix-demo.sh`](scripts/swe-fix-demo.sh) dengan `ISSUE_URL=…`.
 - **`cantrik fix` / agents:** `cantrik fix URL --approve --fetch --run-agents` (+ timeout `CANTRIK_FIX_AGENT_TIMEOUT_SEC`); `--run-experiment` merantai mode experiment; `cantrik agents "…" --reflect` = satu putaran reviewer LLM.
+- **Agent harness artefak:** `cantrik status --write-harness-summary` menulis `.cantrik/session-harness-summary.json` (payload job + `generated_at_unix`) untuk di-attach ke CI atau dashboard eksternal.
 
 ---
 

@@ -53,3 +53,6 @@ jobs:
 
       - name: PKGBUILD references cantrik-cli package
         run: grep -q 'cantrik-cli' packaging/arch/PKGBUILD
+
+      - name: Recipes registry JSON schema (minimal)
+        run: python3 scripts/validate-recipes-registry.py apps/cantrik-site/static/registry/recipes.json

@@ -353,6 +353,7 @@ fn handle_line(
                     coverage: false,
                     deny: false,
                     audit: false,
+                    sarif: false,
                 };
                 let rep = rt.block_on(health::run_report(cwd, config, &cli));
                 for l in rep.lines {

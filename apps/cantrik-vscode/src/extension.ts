@@ -24,12 +24,17 @@ function cantrikOutput(): vscode.OutputChannel {
   return vscode.window.createOutputChannel(OUTPUT);
 }
 
-function runCantrikCapture(args: string[], title: string): void {
+function runCantrikCapture(
+  args: string[],
+  title: string,
+  options?: { cwd?: string }
+): void {
   const ch = cantrikOutput();
   const bin = cantrikExecutable();
   ch.appendLine(`$ ${bin} ${args.join(" ")}`);
   try {
     const out = child_process.execFileSync(bin, args, {
+      cwd: options?.cwd,
       encoding: "utf8",
       maxBuffer: 8 * 1024 * 1024,
     });
@@ -58,8 +63,9 @@ function refreshStatusBar(): void {
   statusBar.text = `$(hubot) Cantrik · ${label}`;
   statusBar.tooltip = "Cantrik — resolving version…";
   statusBar.show();
+  const bin = cantrikExecutable();
   child_process.execFile(
-    "cantrik",
+    bin,
     ["--version"],
     { encoding: "utf8", timeout: 12_000 },
     (err, stdout) => {
@@ -156,6 +162,7 @@ type TreeCmd = { label: string; command: string; args?: string[] };
 
 const TREE_ITEMS: TreeCmd[] = [
   { label: "Doctor", command: "cantrik.doctor" },
+  { label: "Doctor (workspace cwd)", command: "cantrik.runInWorkspace" },
   { label: "Health (audit only)", command: "cantrik.health" },
   { label: "Version", command: "cantrik.version" },
   { label: "Start LSP", command: "cantrik.startLsp" },
@@ -213,10 +220,24 @@ export function activate(context: vscode.ExtensionContext): void {
       cantrikOutput().show(true);
     }),
     vscode.commands.registerCommand("cantrik.doctor", () => {
-      runCantrikCapture(["doctor"], "cantrik doctor");
+      const root = workspaceRoot();
+      runCantrikCapture(["doctor"], "cantrik doctor", root ? { cwd: root } : undefined);
+    }),
+    vscode.commands.registerCommand("cantrik.runInWorkspace", () => {
+      const root = workspaceRoot();
+      if (!root) {
+        void vscode.window.showErrorMessage("Open a workspace folder first.");
+        return;
+      }
+      runCantrikCapture(["doctor"], "cantrik doctor (workspace)", { cwd: root });
     }),
     vscode.commands.registerCommand("cantrik.health", () => {
-      runCantrikCapture(["health", "--no-clippy", "--no-test"], "cantrik health");
+      const root = workspaceRoot();
+      runCantrikCapture(
+        ["health", "--no-clippy", "--no-test"],
+        "cantrik health",
+        root ? { cwd: root } : undefined
+      );
     }),
     vscode.commands.registerCommand("cantrik.version", () => {
       runCantrikCapture(["--version"], "cantrik --version");

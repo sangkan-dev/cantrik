@@ -250,6 +250,7 @@ pub async fn run() -> ExitCode {
             coverage,
             deny,
             audit,
+            sarif,
         }) => {
             commands::health::run(
                 &cwd,
@@ -263,6 +264,7 @@ pub async fn run() -> ExitCode {
                     coverage: *coverage,
                     deny: *deny,
                     audit: *audit,
+                    sarif: *sarif,
                 },
             )
             .await
@@ -314,15 +316,8 @@ pub async fn run() -> ExitCode {
                 }
             };
             let g = words_to_line(goal);
-            return commands::agents_cmd::run(
-                &config,
-                &cwd,
-                &g,
-                *dry_run,
-                *max_parallel,
-                *reflect,
-            )
-            .await;
+            return commands::agents_cmd::run(&config, &cwd, &g, *dry_run, *max_parallel, *reflect)
+                .await;
         }
         Some(Command::Session { sub }) => match sub {
             SessionCommand::List => commands::session_cmd::list_cmd(&cwd).await,
@@ -354,7 +349,11 @@ pub async fn run() -> ExitCode {
                 }
             }
         }
-        Some(Command::Exec { approve, argv }) => {
+        Some(Command::Exec {
+            approve,
+            remote,
+            argv,
+        }) => {
             let config = match load_merged_config(&cwd) {
                 Ok(c) => c,
                 Err(e) => {
@@ -362,7 +361,7 @@ pub async fn run() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-            commands::exec_cmd::run(&config, &cwd, *approve, argv.clone()).await
+            commands::exec_cmd::run(&config, &cwd, *approve, *remote, argv.clone()).await
         }
         Some(Command::Rgrep { args }) => {
             let config = match load_merged_config(&cwd) {
@@ -414,9 +413,12 @@ pub async fn run() -> ExitCode {
         Some(Command::Background { no_notify, args }) => {
             commands::background_cmd::run(&cwd, !*no_notify, args).await
         }
-        Some(Command::Status { all, limit, json }) => {
-            commands::status_cmd::run(&cwd, *all, *limit, *json).await
-        }
+        Some(Command::Status {
+            all,
+            limit,
+            json,
+            write_harness_summary,
+        }) => commands::status_cmd::run(&cwd, *all, *limit, *json, *write_harness_summary).await,
         Some(Command::Daemon { poll_secs }) => commands::daemon_cmd::run(*poll_secs).await,
         Some(Command::Search {
             project,
@@ -654,6 +656,7 @@ mod tests {
             "--coverage",
             "--deny",
             "--audit",
+            "--sarif",
         ])
         .expect("parse");
         match cli.cmd.expect("cmd") {
@@ -667,6 +670,7 @@ mod tests {
                 coverage,
                 deny,
                 audit,
+                sarif,
             } => {
                 assert!(soft);
                 assert!(no_clippy);
@@ -677,8 +681,27 @@ mod tests {
                 assert!(coverage);
                 assert!(deny);
                 assert!(audit);
+                assert!(sarif);
             }
             _ => panic!("expected health"),
+        }
+    }
+
+    #[test]
+    fn parse_exec_remote_trailing_argv() {
+        let cli = Cli::try_parse_from(["cantrik", "exec", "--remote", "--", "uname", "-a"])
+            .expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Exec {
+                approve,
+                remote,
+                argv,
+            } => {
+                assert!(!approve);
+                assert!(remote);
+                assert_eq!(argv, vec!["uname", "-a"]);
+            }
+            _ => panic!("expected exec"),
         }
     }
 

@@ -22,6 +22,7 @@ pub(super) enum Lang {
     Json,
     Yaml,
     Markdown,
+    Bash,
 }
 
 impl Lang {
@@ -43,6 +44,7 @@ impl Lang {
             Lang::Json => "json",
             Lang::Yaml => "yaml",
             Lang::Markdown => "markdown",
+            Lang::Bash => "bash",
         }
     }
 
@@ -64,6 +66,7 @@ impl Lang {
             Lang::Json => tree_sitter_json::LANGUAGE.into(),
             Lang::Yaml => tree_sitter_yaml::LANGUAGE.into(),
             Lang::Markdown => tree_sitter_md::LANGUAGE.into(),
+            Lang::Bash => tree_sitter_bash::LANGUAGE.into(),
         }
     }
 
@@ -183,6 +186,11 @@ impl Lang {
 (fenced_code_block) @chunk
 "
             }
+            Lang::Bash => {
+                r"
+(function_definition name: (word) @name) @chunk
+"
+            }
         }
     }
 
@@ -214,6 +222,7 @@ pub(super) fn detect_language(rel_path: &str) -> Option<Lang> {
         "json" => Lang::Json,
         "yaml" | "yml" => Lang::Yaml,
         "md" | "markdown" => Lang::Markdown,
+        "sh" | "bash" => Lang::Bash,
         _ => return None,
     })
 }
@@ -355,6 +364,13 @@ mod tests {
                 .iter()
                 .any(|c| c.symbol == "Foo" || c.symbol == "bar")
         );
+    }
+
+    #[test]
+    fn chunk_bash_function() {
+        let src = "foo() { echo hi; }\n";
+        let (_, chunks) = extract_chunks("x.sh", src.as_bytes()).unwrap();
+        assert!(chunks.iter().any(|c| c.symbol == "foo"));
     }
 
     #[test]

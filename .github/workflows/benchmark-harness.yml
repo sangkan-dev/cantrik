@@ -1,16 +1,27 @@
-# Placeholder for SWE-bench / Terminal-Bench wiring. Run manually; does not gate releases.
+# Optional SWE-bench / Terminal-Bench harness hook. Does not gate the main Rust CI job.
 name: benchmark harness
 
 on:
   workflow_dispatch:
 
 jobs:
-  note:
+  harness-placeholder:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Placeholder
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Mini dataset directory (placeholder)
         run: |
-          echo "Plug external harness here (e.g. clone SWE-bench, run cantrik against tasks)."
+          mkdir -p .bench/minimal
+          echo "# Bench placeholder — replace with submodule or fetch of SWE-bench / Terminal-Bench slice." > .bench/minimal/README.md
+          test -f .bench/minimal/README.md
+
+      - name: Document local baseline
+        run: |
           echo "Local baseline: ./scripts/phase5-smoke.sh"
-          echo "Optional hook: CANTRIK_BENCH_HARNESS=1"
+          echo "Optional env when wiring an external runner: CANTRIK_BENCH_HARNESS=1"
+          echo "Full cantrik build + bench execution belongs here in a follow-up iteration."
+
+      - name: Success
+        run: echo "benchmark-harness: placeholder OK (exit 0)"

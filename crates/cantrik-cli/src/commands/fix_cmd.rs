@@ -26,6 +26,18 @@ fn fix_agent_timeout_sec() -> u64 {
         .unwrap_or(900)
 }
 
+pub(crate) fn validate_fix_flags(
+    run_agents: bool,
+    run_experiment: bool,
+    approve: bool,
+    fetch: bool,
+) -> Result<(), &'static str> {
+    if (run_agents || run_experiment) && (!approve || !fetch) {
+        return Err("fix: --run-agents / --run-experiment require --approve and --fetch");
+    }
+    Ok(())
+}
+
 /// MVP: print a concrete recipe; `--approve --fetch` runs fetch; optional `--run-agents` and `--run-experiment` chain after success.
 pub async fn run(
     cwd: &Path,
@@ -46,8 +58,8 @@ pub async fn run(
         return ExitCode::from(2);
     }
 
-    if (run_agents || run_experiment) && (!approve || !fetch) {
-        eprintln!("fix: --run-agents / --run-experiment require --approve and --fetch");
+    if let Err(msg) = validate_fix_flags(run_agents, run_experiment, approve, fetch) {
+        eprintln!("{msg}");
         return ExitCode::from(2);
     }
 
@@ -63,7 +75,9 @@ pub async fn run(
         "  2) Implement: cantrik agents \"Address issue: {u} — summarize goal and constraints from fetch output.\""
     );
     if run_agents {
-        println!("     (or `cantrik fix … --approve --fetch --run-agents`; timeout: CANTRIK_FIX_AGENT_TIMEOUT_SEC).");
+        println!(
+            "     (or `cantrik fix … --approve --fetch --run-agents`; timeout: CANTRIK_FIX_AGENT_TIMEOUT_SEC)."
+        );
     }
     println!(
         "  3) Ship:      cantrik experiment --approve \"…\"   # or `cantrik fix … --run-experiment` after fetch"
@@ -80,7 +94,9 @@ pub async fn run(
     }
 
     if !fetch {
-        eprintln!("fix: pass --fetch together with --approve to execute step 1 (fetch issue HTML).");
+        eprintln!(
+            "fix: pass --fetch together with --approve to execute step 1 (fetch issue HTML)."
+        );
         return ExitCode::from(2);
     }
 
@@ -122,4 +138,24 @@ pub async fn run(
     }
 
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_github_issue_url() {
+        assert!(is_github_issue_url(
+            "https://github.com/sangkan-dev/cantrik/issues/1"
+        ));
+        assert!(!is_github_issue_url("https://example.com/ticket/1"));
+    }
+
+    #[test]
+    fn validate_fix_flags_blocks_chained_without_approve_fetch() {
+        assert!(validate_fix_flags(true, false, false, false).is_err());
+        assert!(validate_fix_flags(false, true, true, false).is_err());
+        assert!(validate_fix_flags(true, false, true, true).is_ok());
+    }
 }

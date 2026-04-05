@@ -76,6 +76,10 @@
       {
         "command": "cantrik.showOutput",
         "title": "Cantrik: Show output channel"
+      },
+      {
+        "command": "cantrik.runInWorkspace",
+        "title": "Cantrik: Run in workspace folder (doctor)"
       }
     ]
   },

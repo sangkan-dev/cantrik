@@ -41,6 +41,31 @@ pub struct AppConfig {
     /// Optional extra workspace roots for session fingerprint (Sprint 18 follow-up, monorepo).
     #[serde(default)]
     pub workspace: WorkspaceConfig,
+    /// `cantrik exec --remote` target (hybrid SSH MVP, RFC `docs/rfc-hybrid-ssh-executor.md`).
+    #[serde(default)]
+    pub remote_exec: RemoteExecConfig,
+}
+
+/// SSH destination for remote command preview / execution (`cantrik exec --remote`).
+#[derive(Debug, Clone, Deserialize, Default, PartialEq, Eq)]
+pub struct RemoteExecConfig {
+    /// Remote hostname or `user@host` form is **not** supported here — use `user` + `host` separately.
+    pub host: Option<String>,
+    pub user: Option<String>,
+    /// Passed to `ssh -i` when set.
+    pub identity_file: Option<String>,
+    /// Extra `ssh` argv inserted before the destination (e.g. `-p`, `2222`).
+    #[serde(default)]
+    pub extra_ssh_args: Vec<String>,
+}
+
+/// `ssh` destination string (`user@host` or bare `host` when user omitted).
+pub fn remote_ssh_destination(c: &RemoteExecConfig) -> Option<String> {
+    let host = c.host.as_deref().map(str::trim).filter(|s| !s.is_empty())?;
+    match c.user.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(u) => Some(format!("{u}@{host}")),
+        None => Some(host.to_string()),
+    }
 }
 
 /// Extra directories merged into the session project fingerprint when non-empty (Sprint 18 follow-up).
@@ -434,6 +459,28 @@ impl AppConfig {
                     &self.workspace.extra_roots,
                     &override_config.workspace.extra_roots,
                 ),
+            },
+            remote_exec: RemoteExecConfig {
+                host: override_config
+                    .remote_exec
+                    .host
+                    .clone()
+                    .or_else(|| self.remote_exec.host.clone()),
+                user: override_config
+                    .remote_exec
+                    .user
+                    .clone()
+                    .or_else(|| self.remote_exec.user.clone()),
+                identity_file: override_config
+                    .remote_exec
+                    .identity_file
+                    .clone()
+                    .or_else(|| self.remote_exec.identity_file.clone()),
+                extra_ssh_args: if !override_config.remote_exec.extra_ssh_args.is_empty() {
+                    override_config.remote_exec.extra_ssh_args.clone()
+                } else {
+                    self.remote_exec.extra_ssh_args.clone()
+                },
             },
         }
     }

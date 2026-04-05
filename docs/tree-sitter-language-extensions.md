@@ -16,6 +16,10 @@
 
 The popular `tree-sitter-kotlin` crate (0.3.8) currently pins `tree-sitter` to **&lt; 0.23**, so it **cannot** be used in this workspace without a grammar upgrade or fork. Revisit when a 0.26-compatible release exists.
 
+## Bash (sh)
+
+`tree-sitter-bash` (see `crates/cantrik-core/Cargo.toml`) is wired for `.sh` / `.bash` in [`chunk.rs`](../crates/cantrik-core/src/indexing/chunk.rs); follow the same checklist for future grammars.
+
 ## References
 
 - Internal indexer entrypoint: [`indexing/mod.rs`](../crates/cantrik-core/src/indexing/mod.rs)

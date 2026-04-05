@@ -2,7 +2,7 @@
 
 ## Status
 
-Design only — **no production executor** until this RFC is reviewed and security sign-off exists.
+**MVP (CLI):** `cantrik exec --remote` prints the `ssh` line from `[remote_exec]` (dry-run); with `--approve` it runs `ssh` locally. Full file sync, sandbox mapping on remote, and product “GA” for enterprise remain **behind review** and tests per this RFC.
 
 ## Motivation
 
@@ -38,7 +38,7 @@ user = "builder"
 # identity_file = "~/.ssh/id_ed25519"
 ```
 
-CLI flags might mirror: `cantrik exec --remote --approve …` (exact UX TBD).
+CLI: `cantrik exec --remote …` (dry-run) and `cantrik exec --remote --approve …` (runs `ssh`). Timeout: `CANTRIK_REMOTE_EXEC_TIMEOUT_SEC` (default 3600).
 
 ## Open questions
 

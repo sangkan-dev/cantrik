@@ -107,6 +107,9 @@ pub enum Command {
     Exec {
         #[arg(long)]
         approve: bool,
+        /// Preview or run via `ssh` using `[remote_exec]` (dry-run unless `--approve`). See `docs/rfc-hybrid-ssh-executor.md`.
+        #[arg(long)]
+        remote: bool,
         #[arg(required = true, trailing_var_arg = true, value_name = "COMMAND")]
         argv: Vec<String>,
     },
@@ -154,6 +157,9 @@ pub enum Command {
         /// Emit JSON (dashboard / automation MVP, Phase 5 backlog).
         #[arg(long)]
         json: bool,
+        /// Write `.cantrik/session-harness-summary.json` (same job list as `--json` plus timestamp).
+        #[arg(long)]
+        write_harness_summary: bool,
     },
     /// Long-running worker: claims queued background jobs and runs a bounded LLM round each time.
     Daemon {
@@ -365,6 +371,9 @@ pub enum Command {
         /// Include `cargo audit` (requires `cargo install cargo-audit`).
         #[arg(long)]
         audit: bool,
+        /// Emit SARIF 2.1.0 JSON to stdout instead of a text report (for CI / dashboards).
+        #[arg(long)]
+        sarif: bool,
     },
     /// Print shell completions to stdout (write to a file or source from your shell).
     Completions {

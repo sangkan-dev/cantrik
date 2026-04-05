@@ -6,6 +6,7 @@ use std::process::ExitCode;
 use cantrik_core::config::{
     AppConfig, effective_audit_command, load_merged_config, resolve_config_paths,
 };
+use serde_json::{Value, json};
 use tokio::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -20,17 +21,91 @@ pub struct HealthCli {
     pub coverage: bool,
     pub deny: bool,
     pub audit: bool,
+    pub sarif: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct HealthStep {
+    pub name: String,
+    pub ok: bool,
+    pub detail: String,
 }
 
 pub struct HealthReport {
     pub lines: Vec<String>,
     pub any_fail: bool,
+    pub steps: Vec<HealthStep>,
 }
 
 struct StepResult {
     name: &'static str,
     ok: bool,
     detail: String,
+}
+
+fn rule_id_for_step_name(name: &str) -> String {
+    let slug: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let slug = slug.trim_matches('-');
+    format!("cantrik.health.{slug}")
+}
+
+/// SARIF 2.1.0 document for one `cantrik health` run (includes passing and failing checks).
+pub fn health_report_sarif(report: &HealthReport, tool_version: &str) -> Value {
+    let rules: Vec<Value> = report
+        .steps
+        .iter()
+        .map(|s| {
+            let id = rule_id_for_step_name(&s.name);
+            json!({
+                "id": id,
+                "shortDescription": { "text": s.name }
+            })
+        })
+        .collect();
+
+    let results: Vec<Value> = report
+        .steps
+        .iter()
+        .map(|s| {
+            let id = rule_id_for_step_name(&s.name);
+            let level = if s.ok { "note" } else { "error" };
+            let mut text = s.detail.clone();
+            if text.len() > 8000 {
+                text.truncate(8000);
+                text.push('…');
+            }
+            json!({
+                "ruleId": id,
+                "level": level,
+                "message": { "text": text }
+            })
+        })
+        .collect();
+
+    json!({
+        "version": "2.1.0",
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "cantrik-health",
+                    "version": tool_version,
+                    "informationUri": "https://github.com/sangkan-dev/cantrik",
+                    "rules": rules
+                }
+            },
+            "results": results
+        }]
+    })
 }
 
 async fn run_argv(
@@ -230,6 +305,15 @@ pub async fn run_report(cwd: &Path, config: &AppConfig, cli: &HealthCli) -> Heal
         }
     }
 
+    let health_steps: Vec<HealthStep> = steps
+        .iter()
+        .map(|s| HealthStep {
+            name: s.name.to_string(),
+            ok: s.ok,
+            detail: s.detail.clone(),
+        })
+        .collect();
+
     let mut any_fail = false;
     for s in &steps {
         let status = if s.ok { "OK" } else { "FAIL" };
@@ -250,7 +334,11 @@ pub async fn run_report(cwd: &Path, config: &AppConfig, cli: &HealthCli) -> Heal
         lines.push("health: summary: all checks passed.".into());
     }
 
-    HealthReport { lines, any_fail }
+    HealthReport {
+        lines,
+        any_fail,
+        steps: health_steps,
+    }
 }
 
 pub async fn run(cwd: &Path, cli: &HealthCli) -> ExitCode {
@@ -267,8 +355,20 @@ pub async fn run(cwd: &Path, cli: &HealthCli) -> ExitCode {
     };
 
     let report = run_report(cwd, &config, cli).await;
-    for l in &report.lines {
-        println!("{l}");
+
+    if cli.sarif {
+        let doc = health_report_sarif(&report, env!("CARGO_PKG_VERSION"));
+        match serde_json::to_string_pretty(&doc) {
+            Ok(s) => println!("{s}"),
+            Err(e) => {
+                eprintln!("health: sarif json: {e}");
+                return ExitCode::FAILURE;
+            }
+        }
+    } else {
+        for l in &report.lines {
+            println!("{l}");
+        }
     }
 
     if report.any_fail {

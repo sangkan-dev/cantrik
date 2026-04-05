@@ -28,6 +28,14 @@ The popular `tree-sitter-kotlin` crate (0.3.8) currently pins `tree-sitter` to *
 
 `tree-sitter-html` indexes `.html` / `.htm` (element / `script_element` / `style_element` with `tag_name`) in the same module.
 
+## Makefile
+
+`tree-sitter-make` indexes `Makefile` / `*.mk` (`rule` targets, `variable_assignment`) in the same module.
+
+## Scala
+
+`tree-sitter-scala` indexes `.scala` / `.sc` (class/object/trait/function definitions with `name`) in the same module.
+
 ## References
 
 - Internal indexer entrypoint: [`indexing/mod.rs`](../crates/cantrik-core/src/indexing/mod.rs)

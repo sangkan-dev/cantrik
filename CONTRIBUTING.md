@@ -83,7 +83,7 @@ Untuk menambah entri di [`apps/cantrik-site/static/registry/recipes.json`](apps/
 - Set `sandbox.level = "container"` **hanya** jika operator siap: butuh biner `runsc` dan kebijakan host.
 - Set env `CANTRIK_RUNSC_BIN` ke path `runsc`. Opsional: `CANTRIK_RUNSC_RUN_ARGS` — token dipisah spasi yang disisipkan setelah `runsc run` (contoh: `--network=none` jika didukung setup Anda).
 - Tanpa env tersebut, level `container` gagal dengan pesan jelas (lebih aman daripada mengeksekusi tanpa isolasi yang dimaksud).
-- **CI:** runner GitHub Actions default tidak menyediakan `runsc` atau izin privileged; gunakan runner self-hosted atau abaikan job khusus sampai kebijakan infra jelas. Validasi lokal dengan `CANTRIK_RUNSC_BIN` tetap menjadi tanggung jawab operator. Workflow opsional (manual): [`.github/workflows/runsc-sandbox-smoke.yml`](.github/workflows/runsc-sandbox-smoke.yml) — set variabel repo `CANTRIK_RUNSC_SELF_HOSTED=true` hanya jika runner self-hosted dengan `runsc` tersedia.
+- **CI:** runner GitHub Actions default tidak menyediakan `runsc` atau izin privileged; gunakan runner self-hosted atau abaikan job khusus sampai kebijakan infra jelas. Validasi lokal dengan `CANTRIK_RUNSC_BIN` tetap menjadi tanggung jawab operator. Workflow opsional (manual): [`.github/workflows/runsc-sandbox-smoke.yml`](.github/workflows/runsc-sandbox-smoke.yml) — set variabel repo `CANTRIK_RUNSC_SELF_HOSTED=true` hanya jika runner self-hosted dengan `runsc` tersedia. Arah micro-VM / gate PR: [`docs/runsc-microvm-roadmap.md`](docs/runsc-microvm-roadmap.md).
 
 ### Desktop tray (Tauri) — file flag approval
 
@@ -102,7 +102,8 @@ Menjalankan Cantrik pada **repo Cantrik sendiri** untuk saran perbaikan:
 - Otomatisasi penuh “self-rewrite” tetap di backlog hingga ada gate produk (tes, approval, rollback).
 - **Dry-run skrip:** [`scripts/self-improve-dry-run.sh`](scripts/self-improve-dry-run.sh) menjalankan satu `cantrik ask` read-only pada repo (tanpa `--approve`); gunakan sebagai langkah manual sebelum otomasi patch.
 - **Gate sebelum otomasi patch (MVP):** wajibkan dry-run + review manusia pada diff; batasi konteks/token di config; otomasi PR hanya dari **fork** atau branch eksperimen; tidak ada loop tanpa henti tanpa human-in-the-loop.
-- **CI opsional (fork / manual):** [`.github/workflows/self-improve-gate.yml`](.github/workflows/self-improve-gate.yml) — `workflow_dispatch`: gate `cargo test --workspace`; centang input `run_llm_dry_run` untuk menjalankan skrip dry-run setelah build (butuh kunci provider di runner).
+- **CI opsional (fork / manual):** [`.github/workflows/self-improve-gate.yml`](.github/workflows/self-improve-gate.yml) — `workflow_dispatch`: gate `cargo test --workspace`; input `run_llm_dry_run` (dry-run skrip) atau `run_suggest_patch` (artefak `.cantrik/self-improve-suggestions.txt`; butuh kunci provider di runner). Tidak ada merge otomatis ke `main`.
+- **Saran patch bergate (tanpa merge):** [`scripts/self-improve-suggest-patch.sh`](scripts/self-improve-suggest-patch.sh) menulis `.cantrik/self-improve-suggestions.txt` via satu `cantrik ask` terbatas; tidak membuat PR atau mengubah cabang `main`.
 
 ### SWE constrained workflow (manual checklist)
 
@@ -121,7 +122,7 @@ Alur terbatas untuk satu issue publik + satu repo lokal:
 
 - **Tree-sitter:** lihat [`docs/tree-sitter-language-extensions.md`](docs/tree-sitter-language-extensions.md) (kompatibilitas grammar vs versi `tree-sitter` workspace); satu bahasa per PR.
 - **Sandbox enterprise (gVisor / Firecracker):** titik masuk ada di `crates/cantrik-core/src/tool_system/sandbox.rs`; butuh desain admin + CI khusus.
-- **Hybrid SSH / cloud executor:** RFC [`docs/rfc-hybrid-ssh-executor.md`](docs/rfc-hybrid-ssh-executor.md); MVP CLI: `cantrik exec --remote` + `[remote_exec]`. **Sync:** `cantrik sync` mencetak perintah `rsync` (mode `--dry-run` bawaan); `cantrik sync --approve` menjalankan rsync setelah review. Set `[remote_exec].sync_remote_dir`. Manual `rsync`/`scp` tetap didukung untuk alur kustom.
+- **Hybrid SSH / cloud executor:** RFC [`docs/rfc-hybrid-ssh-executor.md`](docs/rfc-hybrid-ssh-executor.md); MVP CLI: `cantrik exec --remote` + `[remote_exec]`. **Sync:** `cantrik sync` mencetak perintah `rsync` (mode `--dry-run` bawaan); `cantrik sync --approve` menjalankan rsync setelah review. Set `[remote_exec].sync_remote_dir`. Opsional **sinyal kedua:** env `CANTRIK_REMOTE_SYNC_APPROVE_FILE` harus menunjuk ke file yang ada sebelum `sync --approve` dijalankan (lihat RFC § *Remote sync approval*). Manual `rsync`/`scp` tetap didukung untuk alur kustom.
 - **Benchmark SWE-bench / Terminal-Bench:** skrip baseline [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh) (quality gates + hook `CANTRIK_BENCH_HARNESS=1`); demo alur terbatas [`scripts/swe-fix-demo.sh`](scripts/swe-fix-demo.sh) dengan `ISSUE_URL=…`.
 - **`cantrik fix` / agents:** `cantrik fix URL --approve --fetch --run-agents` (+ timeout `CANTRIK_FIX_AGENT_TIMEOUT_SEC`); `--run-experiment` merantai mode experiment; `cantrik agents "…" --reflect` = satu putaran reviewer LLM.
 - **Agent harness artefak:** `cantrik status --write-harness-summary` menulis `.cantrik/session-harness-summary.json` (payload job + `generated_at_unix`) untuk di-attach ke CI atau dashboard eksternal.

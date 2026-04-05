@@ -11,8 +11,8 @@ labels: ["swe", "testing"]
 
 ## Required for closing "full autonomous SWE-agent"
 
-- [ ] This issue links a **GitHub Actions workflow** (or equivalent) that runs **without** secrets beyond what CI already has, using a **fixture repo** or **recorded HTTP** (no live flaky LLM in the critical path if possible). Baseline hari ini: [`.github/workflows/swe-e2e-smoke.yml`](.github/workflows/swe-e2e-smoke.yml) (wiremock + [`tests/fixtures/cantrik-fix-issue-sample.html`](tests/fixtures/cantrik-fix-issue-sample.html) + unit `fix_cmd::tests`).
-- [ ] At least one **end-to-end scenario**: e.g. issue fixture → `cantrik fix …` (or successor) → assert on workspace state / exit codes.
+- [ ] This issue links a **GitHub Actions workflow** (or equivalent) that runs **without** secrets beyond what CI already has, using a **fixture repo** or **recorded HTTP** (no live flaky LLM in the critical path if possible). Baseline hari ini: [`.github/workflows/swe-e2e-smoke.yml`](.github/workflows/swe-e2e-smoke.yml) — `cargo test … commands::fix_cmd::fetch_integration::` (wiremock, redirect, mini workspace, fixture HTML) + `fix_cmd::tests` + validasi [`tests/fixtures/catalog.json`](tests/fixtures/catalog.json).
+- [ ] At least one **end-to-end scenario** beyond redirect + mini-workspace: mis. multi-file assert, atau checkout fixture repo terpisah → `cantrik fix …` → assert artefak di disk (bukan hanya exit code).
 - [ ] **Rollback / safety**: document what happens on failure; no silent destructive defaults.
 
 ## Scenario notes

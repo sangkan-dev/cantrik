@@ -147,7 +147,7 @@ mod fetch_integration {
     use std::process::ExitCode;
 
     use cantrik_core::config::AppConfig;
-    use wiremock::matchers::method;
+    use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     use super::run;
@@ -170,6 +170,63 @@ mod fetch_integration {
             code,
             ExitCode::SUCCESS,
             "fix --approve --fetch should succeed against local fixture HTTP"
+        );
+    }
+
+    /// Mini “fixture repo”: non-empty workspace (README) + `fix --approve --fetch` still succeeds (exit code only; no LLM).
+    #[tokio::test]
+    async fn fix_approve_fetch_succeeds_in_mini_workspace() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join("README.md"), "# swe-e2e mini workspace\n")
+            .expect("write README");
+
+        let srv = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                "<html><head><title>Mini ws issue</title></head><body>ok</body></html>",
+            ))
+            .mount(&srv)
+            .await;
+
+        let url = format!("{}/issues/mini", srv.uri());
+        let cfg = AppConfig::default();
+        let code = run(tmp.path(), &cfg, &url, true, true, false, false).await;
+        assert_eq!(code, ExitCode::SUCCESS);
+        assert!(
+            tmp.path().join("README.md").is_file(),
+            "workspace files should remain after fix fetch"
+        );
+    }
+
+    /// Multi-hop HTTP (no LLM): entry URL returns 302; client follows to final issue HTML (reqwest default redirect policy).
+    #[tokio::test]
+    async fn fix_approve_fetch_follows_redirect_chain() {
+        let srv = MockServer::start().await;
+        let final_path = "/issues/final-body";
+        let location = format!("{}{final_path}", srv.uri());
+        Mock::given(method("GET"))
+            .and(path("/issues/entry"))
+            .respond_with(
+                ResponseTemplate::new(302).insert_header("Location", location.as_str()),
+            )
+            .mount(&srv)
+            .await;
+        Mock::given(method("GET"))
+            .and(path(final_path))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                "<html><head><title>After redirect</title></head><body>ok</body></html>",
+            ))
+            .mount(&srv)
+            .await;
+
+        let url = format!("{}/issues/entry", srv.uri());
+        let cfg = AppConfig::default();
+        let tmp = std::env::temp_dir();
+        let code = run(Path::new(&tmp), &cfg, &url, true, true, false, false).await;
+        assert_eq!(
+            code,
+            ExitCode::SUCCESS,
+            "fix --approve --fetch should follow redirect to final issue body"
         );
     }
 

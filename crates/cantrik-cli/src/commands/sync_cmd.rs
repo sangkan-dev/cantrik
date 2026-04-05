@@ -96,6 +96,16 @@ pub(crate) fn run(config: &AppConfig, cwd: &Path, approve: bool, src: &Path) -> 
         return ExitCode::SUCCESS;
     }
 
+    if let Ok(flag) = std::env::var("CANTRIK_REMOTE_SYNC_APPROVE_FILE") {
+        let flag = flag.trim();
+        if !flag.is_empty() && !Path::new(flag).is_file() {
+            eprintln!(
+                "sync: CANTRIK_REMOTE_SYNC_APPROVE_FILE is set but file is missing: {flag}"
+            );
+            return ExitCode::FAILURE;
+        }
+    }
+
     let mut cmd = std::process::Command::new("rsync");
     cmd.arg("-az").arg("--delete").arg("-e").arg(&ssh_e);
     cmd.arg(&src_arg).arg(&remote_target);
@@ -141,6 +151,32 @@ mod tests {
         };
         let cwd = std::env::current_dir().unwrap();
         let code = run(&cfg, &cwd, false, Path::new("."));
+        assert_eq!(code, std::process::ExitCode::FAILURE);
+    }
+
+    #[test]
+    fn sync_approve_requires_flag_file_when_env_set() {
+        let mut cfg = AppConfig::default();
+        cfg.remote_exec = RemoteExecConfig {
+            host: Some("h.example.com".into()),
+            user: Some("u".into()),
+            identity_file: None,
+            extra_ssh_args: vec![],
+            sync_remote_dir: Some("/tmp/remote".into()),
+        };
+        let missing_flag = std::env::temp_dir().join("cantrik_sync_flag_missing_test_xyz");
+        // SAFETY: test mutates process environment; no other threads read this var here.
+        unsafe {
+            std::env::set_var(
+                "CANTRIK_REMOTE_SYNC_APPROVE_FILE",
+                missing_flag.to_string_lossy().as_ref(),
+            );
+        }
+        let cwd = std::env::temp_dir();
+        let code = run(&cfg, &cwd, true, Path::new("."));
+        unsafe {
+            std::env::remove_var("CANTRIK_REMOTE_SYNC_APPROVE_FILE");
+        }
         assert_eq!(code, std::process::ExitCode::FAILURE);
     }
 

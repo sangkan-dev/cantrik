@@ -47,6 +47,14 @@ CLI: `cantrik exec --remote …` (dry-run) and `cantrik exec --remote --approve 
 - How to map `[sandbox]` on remote (likely none or remote-side bubblewrap)?
 - Session correlation: same `.cantrik/` fingerprint or separate “remote session” id?
 
+## Remote sync approval (thin product hook)
+
+**Goal:** mirror the “human in the loop” pattern used for local exec/tray: optional **second signal** before `cantrik sync --approve` mutates a remote tree.
+
+**MVP (env):** if `CANTRIK_REMOTE_SYNC_APPROVE_FILE` is set to a non-empty path, `cantrik sync --approve` requires that path to exist as a regular file (e.g. created by the operator or desktop companion after review). Dry-run (`sync` without `--approve`) is unchanged. Unset env = previous behavior only.
+
+**Future:** dedicated approval UI, Tauri/tray integration, and mapping `[sandbox]` on the remote host remain backlog; document remote-side bubblewrap or “no extra isolation” explicitly per deployment.
+
 ## Decision
 
 Implement only after maintainers accept this RFC and add integration tests for the minimal happy path (single `echo` over SSH with approval).

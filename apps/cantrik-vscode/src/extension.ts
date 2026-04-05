@@ -1,4 +1,6 @@
 import * as child_process from "child_process";
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import {
   LanguageClient,
@@ -52,6 +54,73 @@ function runCantrikCapture(
 
 function workspaceRoot(): string | undefined {
   return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+}
+
+function refreshHarnessSummary(): void {
+  const root = workspaceRoot();
+  if (!root) {
+    void vscode.window.showErrorMessage("Open a workspace folder first.");
+    return;
+  }
+  const bin = cantrikExecutable();
+  try {
+    child_process.execFileSync(bin, ["status", "--write-harness-summary"], {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    openHarnessSummaryEditor();
+    void vscode.window.showInformationMessage("Cantrik harness summary refreshed.");
+  } catch (e: unknown) {
+    const err = e as { stderr?: string; stdout?: string };
+    const msg = err.stderr || err.stdout || String(e);
+    void vscode.window.showErrorMessage(
+      `Refresh harness summary failed: ${msg.slice(0, 200)}`
+    );
+  }
+}
+
+function openHarnessSummaryEditor(): void {
+  const root = workspaceRoot();
+  if (!root) {
+    void vscode.window.showErrorMessage("Open a workspace folder first.");
+    return;
+  }
+  const summaryPath = path.join(root, ".cantrik", "session-harness-summary.json");
+  if (!fs.existsSync(summaryPath)) {
+    void vscode.window.showWarningMessage(
+      `No ${summaryPath}. Run "Cantrik: Write session harness summary" first.`
+    );
+    return;
+  }
+  const raw = fs.readFileSync(summaryPath, "utf8");
+  let pretty = raw;
+  try {
+    pretty = JSON.stringify(JSON.parse(raw) as unknown, null, 2);
+  } catch {
+    /* keep raw */
+  }
+  const panel = vscode.window.createWebviewPanel(
+    "cantrikHarnessSummary",
+    "Cantrik harness summary",
+    vscode.ViewColumn.One,
+    { enableScripts: false }
+  );
+  panel.webview.html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body { font-family: var(--vscode-font-family); font-size: 12px; color: var(--vscode-foreground); margin: 12px; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+    code { font-size: 11px; }
+  </style>
+</head>
+<body>
+  <p><strong>session-harness-summary.json</strong> (<code>${escapeHtml(summaryPath)}</code>)</p>
+  <pre>${escapeHtml(pretty)}</pre>
+</body>
+</html>`;
 }
 
 function refreshStatusBar(): void {
@@ -167,6 +236,14 @@ const TREE_ITEMS: TreeCmd[] = [
     label: "Write harness summary",
     command: "cantrik.writeHarnessSummary",
   },
+  {
+    label: "Open harness summary (webview)",
+    command: "cantrik.openHarnessSummary",
+  },
+  {
+    label: "Refresh harness summary (write + webview)",
+    command: "cantrik.refreshHarnessSummary",
+  },
   { label: "Health (audit only)", command: "cantrik.health" },
   { label: "Version", command: "cantrik.version" },
   { label: "Start LSP", command: "cantrik.startLsp" },
@@ -246,6 +323,12 @@ export function activate(context: vscode.ExtensionContext): void {
         "cantrik status --write-harness-summary",
         { cwd: root }
       );
+    }),
+    vscode.commands.registerCommand("cantrik.openHarnessSummary", () => {
+      openHarnessSummaryEditor();
+    }),
+    vscode.commands.registerCommand("cantrik.refreshHarnessSummary", () => {
+      refreshHarnessSummary();
     }),
     vscode.commands.registerCommand("cantrik.health", () => {
       const root = workspaceRoot();

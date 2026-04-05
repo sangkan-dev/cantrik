@@ -11,6 +11,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Cache SWE-bench checkout
+        uses: actions/cache@v4
+        with:
+          path: .bench/SWE-bench
+          key: swe-bench-${{ runner.os }}-v1-${{ hashFiles('.github/workflows/benchmark-harness.yml') }}
+          restore-keys: |
+            swe-bench-${{ runner.os }}-v1-
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install protoc + bubblewrap + ripgrep
@@ -18,9 +26,12 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Shallow clone SWE-bench (read-only slice)
+      - name: Shallow clone SWE-bench (read-only slice, skip if cache hit)
         run: |
-          git clone --depth 1 https://github.com/princeton-nlp/SWE-bench.git .bench/SWE-bench
+          mkdir -p .bench
+          if [[ ! -f .bench/SWE-bench/README.md ]]; then
+            git clone --depth 1 https://github.com/princeton-nlp/SWE-bench.git .bench/SWE-bench
+          fi
           test -f .bench/SWE-bench/README.md
 
       - name: Mini dataset directory (placeholder)

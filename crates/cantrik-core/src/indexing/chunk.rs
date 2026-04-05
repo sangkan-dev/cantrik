@@ -25,6 +25,8 @@ pub(super) enum Lang {
     Bash,
     Css,
     Html,
+    Makefile,
+    Scala,
 }
 
 impl Lang {
@@ -49,6 +51,8 @@ impl Lang {
             Lang::Bash => "bash",
             Lang::Css => "css",
             Lang::Html => "html",
+            Lang::Makefile => "makefile",
+            Lang::Scala => "scala",
         }
     }
 
@@ -73,6 +77,8 @@ impl Lang {
             Lang::Bash => tree_sitter_bash::LANGUAGE.into(),
             Lang::Css => tree_sitter_css::LANGUAGE.into(),
             Lang::Html => tree_sitter_html::LANGUAGE.into(),
+            Lang::Makefile => tree_sitter_make::LANGUAGE.into(),
+            Lang::Scala => tree_sitter_scala::LANGUAGE.into(),
         }
     }
 
@@ -212,6 +218,20 @@ impl Lang {
 (style_element (start_tag (tag_name) @name)) @chunk
 "
             }
+            Lang::Makefile => {
+                r"
+(rule (targets (word) @name)) @chunk
+(variable_assignment name: (word) @name) @chunk
+"
+            }
+            Lang::Scala => {
+                r"
+(class_definition name: (_) @name) @chunk
+(object_definition name: (_) @name) @chunk
+(trait_definition name: (_) @name) @chunk
+(function_definition name: (_) @name) @chunk
+"
+            }
         }
     }
 
@@ -222,7 +242,13 @@ impl Lang {
 }
 
 pub(super) fn detect_language(rel_path: &str) -> Option<Lang> {
-    let ext = Path::new(rel_path)
+    let path = Path::new(rel_path);
+    if let Some(base) = path.file_name().and_then(|n| n.to_str())
+        && base.eq_ignore_ascii_case("makefile")
+    {
+        return Some(Lang::Makefile);
+    }
+    let ext = path
         .extension()
         .and_then(|e| e.to_str())?
         .to_ascii_lowercase();
@@ -246,6 +272,8 @@ pub(super) fn detect_language(rel_path: &str) -> Option<Lang> {
         "sh" | "bash" => Lang::Bash,
         "css" => Lang::Css,
         "html" | "htm" => Lang::Html,
+        "mk" => Lang::Makefile,
+        "scala" | "sc" => Lang::Scala,
         _ => return None,
     })
 }
@@ -416,6 +444,26 @@ mod tests {
         let (_, chunks) = extract_chunks("x.html", src.as_bytes()).unwrap();
         assert!(
             chunks.iter().any(|c| c.symbol == "div" || c.symbol == "p"),
+            "chunks: {chunks:?}"
+        );
+    }
+
+    #[test]
+    fn chunk_makefile_rule_and_var() {
+        let src = "all:\n\t@echo hi\n\nFOO := 1\n";
+        let (_, chunks) = extract_chunks("Makefile", src.as_bytes()).unwrap();
+        assert!(
+            chunks.iter().any(|c| c.symbol == "all" || c.symbol == "FOO"),
+            "chunks: {chunks:?}"
+        );
+    }
+
+    #[test]
+    fn chunk_scala_object_and_def() {
+        let src = "object Foo {\n  def bar(): Unit = ()\n}\n";
+        let (_, chunks) = extract_chunks("x.scala", src.as_bytes()).unwrap();
+        assert!(
+            chunks.iter().any(|c| c.symbol == "Foo" || c.symbol == "bar"),
             "chunks: {chunks:?}"
         );
     }

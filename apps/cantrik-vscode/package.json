@@ -84,6 +84,14 @@
       {
         "command": "cantrik.writeHarnessSummary",
         "title": "Cantrik: Write session harness summary (.cantrik/)"
+      },
+      {
+        "command": "cantrik.openHarnessSummary",
+        "title": "Cantrik: Open harness summary in editor (webview)"
+      },
+      {
+        "command": "cantrik.refreshHarnessSummary",
+        "title": "Cantrik: Refresh harness summary (write + webview)"
       }
     ]
   },

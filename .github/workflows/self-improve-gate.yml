@@ -8,6 +8,10 @@ on:
         description: "After Rust tests, run scripts/self-improve-dry-run.sh (needs API keys on the runner)"
         type: boolean
         default: false
+      run_suggest_patch:
+        description: "After Rust tests, run scripts/self-improve-suggest-patch.sh and upload .cantrik/self-improve-suggestions.txt (needs API keys; no PR)"
+        type: boolean
+        default: false
 
 jobs:
   cargo-test-workspace:
@@ -37,3 +41,25 @@ jobs:
         run: |
           export PATH="$PWD/target/debug:$PATH"
           bash scripts/self-improve-dry-run.sh
+
+  self-improve-suggest:
+    needs: cargo-test-workspace
+    if: ${{ inputs.run_suggest_patch }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install protoc + bubblewrap + ripgrep
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler bubblewrap ripgrep
+      - uses: Swatinem/rust-cache@v2
+      - name: Build cantrik CLI
+        run: cargo build -p cantrik-cli
+      - name: Suggest patch file (optional; may fail without secrets)
+        run: |
+          export PATH="$PWD/target/debug:$PATH"
+          bash scripts/self-improve-suggest-patch.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: self-improve-suggestions
+          path: .cantrik/self-improve-suggestions.txt
+          if-no-files-found: warn

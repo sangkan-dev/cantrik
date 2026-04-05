@@ -22,11 +22,26 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Run fix fetch integration test (wiremock, no LLM)
-        run: cargo test -p cantrik-cli fix_approve_fetch_reaches_local_http -- --exact --nocapture
+      - name: Fix fetch integration suite (wiremock, redirect, mini workspace, no LLM)
+        run: cargo test -p cantrik-cli commands::fix_cmd::fetch_integration:: -- --nocapture
 
       - name: Fix command unit tests (flags / URL parsing, no network)
         run: cargo test -p cantrik-cli fix_cmd::tests -- --nocapture
 
-      - name: Fix fetch uses checked-in HTML fixture (wiremock, no LLM)
-        run: cargo test -p cantrik-cli fix_approve_fetch_reaches_fixture_file -- --exact --nocapture
+      - name: Validate fixtures catalog.json
+        run: python3 -c "import json; json.load(open('tests/fixtures/catalog.json'))"
+
+  # Optional: set repo variable CANTRIK_FIX_CI_PINNED_URL to a stable raw URL (mitigate flaky — use your own mirror).
+  fix-fetch-pinned-url-opt:
+    if: ${{ vars.CANTRIK_FIX_CI_PINNED_URL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install protoc + bubblewrap + ripgrep
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler bubblewrap ripgrep
+      - uses: Swatinem/rust-cache@v2
+      - name: fix against pinned URL (network)
+        env:
+          CANTRIK_FIX_E2E_HTTP_URL: ${{ vars.CANTRIK_FIX_CI_PINNED_URL }}
+        run: cargo test -p cantrik-cli fix_optional_pinned_http_url_from_env -- --nocapture

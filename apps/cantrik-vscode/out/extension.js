@@ -36,6 +36,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
 const child_process = __importStar(require("child_process"));
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
 const node_1 = require("vscode-languageclient/node");
 const OUTPUT = "Cantrik";
@@ -52,12 +54,13 @@ function cantrikExecutable() {
 function cantrikOutput() {
     return vscode.window.createOutputChannel(OUTPUT);
 }
-function runCantrikCapture(args, title) {
+function runCantrikCapture(args, title, options) {
     const ch = cantrikOutput();
     const bin = cantrikExecutable();
     ch.appendLine(`$ ${bin} ${args.join(" ")}`);
     try {
         const out = child_process.execFileSync(bin, args, {
+            cwd: options?.cwd,
             encoding: "utf8",
             maxBuffer: 8 * 1024 * 1024,
         });
@@ -76,6 +79,64 @@ function runCantrikCapture(args, title) {
 function workspaceRoot() {
     return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
+function refreshHarnessSummary() {
+    const root = workspaceRoot();
+    if (!root) {
+        void vscode.window.showErrorMessage("Open a workspace folder first.");
+        return;
+    }
+    const bin = cantrikExecutable();
+    try {
+        child_process.execFileSync(bin, ["status", "--write-harness-summary"], {
+            cwd: root,
+            encoding: "utf8",
+            maxBuffer: 8 * 1024 * 1024,
+        });
+        openHarnessSummaryEditor();
+        void vscode.window.showInformationMessage("Cantrik harness summary refreshed.");
+    }
+    catch (e) {
+        const err = e;
+        const msg = err.stderr || err.stdout || String(e);
+        void vscode.window.showErrorMessage(`Refresh harness summary failed: ${msg.slice(0, 200)}`);
+    }
+}
+function openHarnessSummaryEditor() {
+    const root = workspaceRoot();
+    if (!root) {
+        void vscode.window.showErrorMessage("Open a workspace folder first.");
+        return;
+    }
+    const summaryPath = path.join(root, ".cantrik", "session-harness-summary.json");
+    if (!fs.existsSync(summaryPath)) {
+        void vscode.window.showWarningMessage(`No ${summaryPath}. Run "Cantrik: Write session harness summary" first.`);
+        return;
+    }
+    const raw = fs.readFileSync(summaryPath, "utf8");
+    let pretty = raw;
+    try {
+        pretty = JSON.stringify(JSON.parse(raw), null, 2);
+    }
+    catch {
+        /* keep raw */
+    }
+    const panel = vscode.window.createWebviewPanel("cantrikHarnessSummary", "Cantrik harness summary", vscode.ViewColumn.One, { enableScripts: false });
+    panel.webview.html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body { font-family: var(--vscode-font-family); font-size: 12px; color: var(--vscode-foreground); margin: 12px; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+    code { font-size: 11px; }
+  </style>
+</head>
+<body>
+  <p><strong>session-harness-summary.json</strong> (<code>${escapeHtml(summaryPath)}</code>)</p>
+  <pre>${escapeHtml(pretty)}</pre>
+</body>
+</html>`;
+}
 function refreshStatusBar() {
     if (!statusBar) {
         return;
@@ -85,7 +146,8 @@ function refreshStatusBar() {
     statusBar.text = `$(hubot) Cantrik · ${label}`;
     statusBar.tooltip = "Cantrik — resolving version…";
     statusBar.show();
-    child_process.execFile("cantrik", ["--version"], { encoding: "utf8", timeout: 12_000 }, (err, stdout) => {
+    const bin = cantrikExecutable();
+    child_process.execFile(bin, ["--version"], { encoding: "utf8", timeout: 12_000 }, (err, stdout) => {
         const ver = err ? "cantrik?" : stdout.trim().split("\n")[0] || "?";
         statusBar.tooltip = `${ver}\nWorkspace: ${root ?? "(open a folder)"}`;
         statusBar.text = `$(hubot) ${ver} · ${label}`;
@@ -169,6 +231,19 @@ class CantrikStatusWebviewProvider {
 }
 const TREE_ITEMS = [
     { label: "Doctor", command: "cantrik.doctor" },
+    { label: "Doctor (workspace cwd)", command: "cantrik.runInWorkspace" },
+    {
+        label: "Write harness summary",
+        command: "cantrik.writeHarnessSummary",
+    },
+    {
+        label: "Open harness summary (webview)",
+        command: "cantrik.openHarnessSummary",
+    },
+    {
+        label: "Refresh harness summary (write + webview)",
+        command: "cantrik.refreshHarnessSummary",
+    },
     { label: "Health (audit only)", command: "cantrik.health" },
     { label: "Version", command: "cantrik.version" },
     { label: "Start LSP", command: "cantrik.startLsp" },
@@ -204,9 +279,29 @@ function activate(context) {
     context.subscriptions.push(vscode.window.registerTreeDataProvider("cantrikSidePanel", new CantrikTreeProvider()), vscode.commands.registerCommand("cantrik.showOutput", () => {
         cantrikOutput().show(true);
     }), vscode.commands.registerCommand("cantrik.doctor", () => {
-        runCantrikCapture(["doctor"], "cantrik doctor");
+        const root = workspaceRoot();
+        runCantrikCapture(["doctor"], "cantrik doctor", root ? { cwd: root } : undefined);
+    }), vscode.commands.registerCommand("cantrik.runInWorkspace", () => {
+        const root = workspaceRoot();
+        if (!root) {
+            void vscode.window.showErrorMessage("Open a workspace folder first.");
+            return;
+        }
+        runCantrikCapture(["doctor"], "cantrik doctor (workspace)", { cwd: root });
+    }), vscode.commands.registerCommand("cantrik.writeHarnessSummary", () => {
+        const root = workspaceRoot();
+        if (!root) {
+            void vscode.window.showErrorMessage("Open a workspace folder first.");
+            return;
+        }
+        runCantrikCapture(["status", "--write-harness-summary"], "cantrik status --write-harness-summary", { cwd: root });
+    }), vscode.commands.registerCommand("cantrik.openHarnessSummary", () => {
+        openHarnessSummaryEditor();
+    }), vscode.commands.registerCommand("cantrik.refreshHarnessSummary", () => {
+        refreshHarnessSummary();
     }), vscode.commands.registerCommand("cantrik.health", () => {
-        runCantrikCapture(["health", "--no-clippy", "--no-test"], "cantrik health");
+        const root = workspaceRoot();
+        runCantrikCapture(["health", "--no-clippy", "--no-test"], "cantrik health", root ? { cwd: root } : undefined);
     }), vscode.commands.registerCommand("cantrik.version", () => {
         runCantrikCapture(["--version"], "cantrik --version");
     }), vscode.commands.registerCommand("cantrik.startLsp", async () => {

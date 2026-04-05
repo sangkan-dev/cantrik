@@ -31,6 +31,9 @@ def main() -> int:
                     file=sys.stderr,
                 )
                 return 1
+        if "verified" in r and not isinstance(r["verified"], bool):
+            print(f"recipes[{i}]: field 'verified' must be boolean if present", file=sys.stderr)
+            return 1
     print(f"recipes: OK ({len(recipes)} entries)")
     return 0
 

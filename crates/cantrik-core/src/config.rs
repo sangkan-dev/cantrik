@@ -57,6 +57,8 @@ pub struct RemoteExecConfig {
     /// Extra `ssh` argv inserted before the destination (e.g. `-p`, `2222`).
     #[serde(default)]
     pub extra_ssh_args: Vec<String>,
+    /// Remote directory for `cantrik sync` (e.g. `/home/user/project`). Required for sync when using config.
+    pub sync_remote_dir: Option<String>,
 }
 
 /// `ssh` destination string (`user@host` or bare `host` when user omitted).
@@ -481,6 +483,11 @@ impl AppConfig {
                 } else {
                     self.remote_exec.extra_ssh_args.clone()
                 },
+                sync_remote_dir: override_config
+                    .remote_exec
+                    .sync_remote_dir
+                    .clone()
+                    .or_else(|| self.remote_exec.sync_remote_dir.clone()),
             },
         }
     }

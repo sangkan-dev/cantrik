@@ -1,0 +1,39 @@
+# Optional gate for forks: workflow_dispatch only; no auto-merge to main.
+name: Self-improve gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_llm_dry_run:
+        description: "After Rust tests, run scripts/self-improve-dry-run.sh (needs API keys on the runner)"
+        type: boolean
+        default: false
+
+jobs:
+  cargo-test-workspace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install protoc + bubblewrap + ripgrep
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler bubblewrap ripgrep
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo test (workspace)
+        run: cargo test --workspace
+
+  self-improve-dry-run:
+    needs: cargo-test-workspace
+    if: ${{ inputs.run_llm_dry_run }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install protoc + bubblewrap + ripgrep
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler bubblewrap ripgrep
+      - uses: Swatinem/rust-cache@v2
+      - name: Build cantrik CLI
+        run: cargo build -p cantrik-cli
+      - name: LLM dry-run (optional; may fail without secrets)
+        run: |
+          export PATH="$PWD/target/debug:$PATH"
+          bash scripts/self-improve-dry-run.sh

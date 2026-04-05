@@ -5,7 +5,8 @@
       "id": "rust-cli",
       "title": "Rust CLI starter",
       "description": "Aligns with `cantrik init --template rust-cli`.",
-      "init_template": "rust-cli"
+      "init_template": "rust-cli",
+      "verified": true
     },
     {
       "id": "generic",

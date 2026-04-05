@@ -45,6 +45,7 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 wasmtime = { version = "43.0.0", default-features = false, features = ["runtime", "cranelift"] }
 arrow-array = "57.3.0"
 arrow-schema = "57.3.0"
+tree-sitter-html = "0.23.2"
 
 [dev-dependencies]
 tempfile = "3.27.0"

@@ -29,6 +29,7 @@ pub(crate) mod rgrep_cmd;
 pub(crate) mod rollback_cmd;
 pub(crate) mod search;
 pub(crate) mod serve_mcp;
+pub(crate) mod sync_cmd;
 pub(crate) mod session_cmd;
 pub(crate) mod session_llm;
 pub(crate) mod skill_cmd;

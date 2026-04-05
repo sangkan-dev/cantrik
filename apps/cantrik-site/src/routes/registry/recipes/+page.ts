@@ -5,6 +5,8 @@ export type RegistryRecipe = {
 	title: string;
 	description: string;
 	init_template: string;
+	/** Set only by maintainers after manual verification (see CONTRIBUTING § Registry recipes). */
+	verified?: boolean;
 };
 
 export const load: PageLoad = async ({ fetch }) => {

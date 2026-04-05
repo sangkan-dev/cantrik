@@ -24,6 +24,7 @@ pub(super) enum Lang {
     Markdown,
     Bash,
     Css,
+    Html,
 }
 
 impl Lang {
@@ -47,6 +48,7 @@ impl Lang {
             Lang::Markdown => "markdown",
             Lang::Bash => "bash",
             Lang::Css => "css",
+            Lang::Html => "html",
         }
     }
 
@@ -70,6 +72,7 @@ impl Lang {
             Lang::Markdown => tree_sitter_md::LANGUAGE.into(),
             Lang::Bash => tree_sitter_bash::LANGUAGE.into(),
             Lang::Css => tree_sitter_css::LANGUAGE.into(),
+            Lang::Html => tree_sitter_html::LANGUAGE.into(),
         }
     }
 
@@ -202,6 +205,13 @@ impl Lang {
   (selectors (id_selector (id_name) @name))) @chunk
 "
             }
+            Lang::Html => {
+                r"
+(element (start_tag (tag_name) @name)) @chunk
+(script_element (start_tag (tag_name) @name)) @chunk
+(style_element (start_tag (tag_name) @name)) @chunk
+"
+            }
         }
     }
 
@@ -235,6 +245,7 @@ pub(super) fn detect_language(rel_path: &str) -> Option<Lang> {
         "md" | "markdown" => Lang::Markdown,
         "sh" | "bash" => Lang::Bash,
         "css" => Lang::Css,
+        "html" | "htm" => Lang::Html,
         _ => return None,
     })
 }
@@ -397,5 +408,15 @@ mod tests {
         let src = r#"{"a": 1}"#;
         let (_, chunks) = extract_chunks("x.json", src.as_bytes()).unwrap();
         assert!(chunks.iter().any(|c| c.symbol.contains('a')));
+    }
+
+    #[test]
+    fn chunk_html_tag() {
+        let src = "<div><p>hi</p></div>\n";
+        let (_, chunks) = extract_chunks("x.html", src.as_bytes()).unwrap();
+        assert!(
+            chunks.iter().any(|c| c.symbol == "div" || c.symbol == "p"),
+            "chunks: {chunks:?}"
+        );
     }
 }

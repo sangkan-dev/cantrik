@@ -2,6 +2,11 @@
 	import { resolve } from '$app/paths';
 
 	let { data } = $props();
+
+	let verifiedOnly = $state(false);
+	const visible = $derived(
+		verifiedOnly ? data.recipes.filter((r) => r.verified === true) : data.recipes
+	);
 </script>
 
 <main class="mx-auto max-w-3xl px-6 py-16">
@@ -14,13 +19,24 @@
 
 	{#if data.recipes.length === 0}
 		<p class="mt-8 font-mono text-sm text-smoke">No recipes listed yet.</p>
+	{:else if visible.length === 0}
+		<p class="mt-8 font-mono text-sm text-smoke">No recipes match “verified only”.</p>
 	{:else}
 		<ul class="mt-10 space-y-6">
-			{#each data.recipes as r (r.id)}
+			{#each visible as r (r.id)}
 				<li
 					class="rounded border border-andesite-lighter bg-andesite-light px-4 py-4 font-mono text-sm"
 				>
-					<p class="font-heading text-base font-medium text-gold-bright">{r.title}</p>
+					<p class="font-heading text-base font-medium text-gold-bright">
+						{r.title}
+						{#if r.verified}
+							<span
+								class="ml-2 rounded bg-gold-dim/20 px-1.5 py-0.5 text-xs font-normal text-gold"
+								title="Checked by maintainers (see CONTRIBUTING § Registry recipes)"
+								>verified</span
+							>
+						{/if}
+					</p>
 					<p class="mt-1 text-ash">{r.description}</p>
 					<p class="mt-2 text-smoke">
 						<span class="text-gold-dim">id</span> {r.id} ·

@@ -363,6 +363,16 @@ pub async fn run() -> ExitCode {
             };
             commands::exec_cmd::run(&config, &cwd, *approve, *remote, argv.clone()).await
         }
+        Some(Command::Sync { approve, src }) => {
+            let config = match load_merged_config(&cwd) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("failed to load config: {e}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            commands::sync_cmd::run(&config, &cwd, *approve, src)
+        }
         Some(Command::Rgrep { args }) => {
             let config = match load_merged_config(&cwd) {
                 Ok(c) => c,
@@ -702,6 +712,26 @@ mod tests {
                 assert_eq!(argv, vec!["uname", "-a"]);
             }
             _ => panic!("expected exec"),
+        }
+    }
+
+    #[test]
+    fn parse_sync_src_and_approve() {
+        let cli = Cli::try_parse_from(["cantrik", "sync", "--src", "./dist"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Sync { approve, src } => {
+                assert!(!approve);
+                assert!(src.ends_with("dist"));
+            }
+            _ => panic!("expected sync"),
+        }
+        let cli = Cli::try_parse_from(["cantrik", "sync", "--approve"]).expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Sync { approve, src } => {
+                assert!(approve);
+                assert_eq!(src, std::path::PathBuf::from("."));
+            }
+            _ => panic!("expected sync"),
         }
     }
 

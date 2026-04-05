@@ -378,42 +378,46 @@ default_model = "llama-3.3-70b-versatile"
  
 - [ ] **Full autonomous SWE-agent** — end-to-end fix GitHub issues dengan reliabilitas tinggi  
   - [x] Alur terbatas: `cantrik fix URL --approve --fetch --run-agents` + timeout agents (`CANTRIK_FIX_AGENT_TIMEOUT_SEC`); demo [`scripts/swe-fix-demo.sh`](scripts/swe-fix-demo.sh); checklist manual [CONTRIBUTING.md](CONTRIBUTING.md) § *SWE constrained workflow*.  
-  - [x] Regresi otomatis tanpa LLM: tes `fix_cmd::fetch_integration::fix_approve_fetch_reaches_local_http` + workflow [`.github/workflows/swe-e2e-smoke.yml`](.github/workflows/swe-e2e-smoke.yml). **Ditunda:** otomasi penuh “high reliability” + fixture skala produk (template [`.github/ISSUE_TEMPLATE/swe_e2e_reliability.md`](.github/ISSUE_TEMPLATE/swe_e2e_reliability.md)).
+  - [x] Regresi otomatis tanpa LLM: wiremock + unit `fix_cmd::tests` + fixture [`tests/fixtures/cantrik-fix-issue-sample.html`](tests/fixtures/cantrik-fix-issue-sample.html); workflow [`.github/workflows/swe-e2e-smoke.yml`](.github/workflows/swe-e2e-smoke.yml). **Ditunda:** otomasi penuh “high reliability” + fixture skala produk (template [`.github/ISSUE_TEMPLATE/swe_e2e_reliability.md`](.github/ISSUE_TEMPLATE/swe_e2e_reliability.md)).
 - [ ] **Agent harness** (refleksi, re-plan, dashboard)  
   - [x] Refleksi: `cantrik agents … --reflect`.  
   - [x] Dashboard statis: [`/dashboard`](apps/cantrik-site/src/routes/dashboard/+page.svelte); `cantrik status --json`.  
   - [x] Re-plan terkonfigurasi: `[planning] max_replan_cycles` / `stuck_threshold_attempts`; ringkasan `plan --run` → `.cantrik/plan-run-summary.json`.  
   - [x] Agregat multi-sesi (MVP): `cantrik status --write-harness-summary` → `.cantrik/session-harness-summary.json`.
-  - [x] Dokumentasi hub: [`/docs/agent-harness`](apps/cantrik-site/src/routes/docs/agent-harness/+page.svelte); VS Code: `cantrik.writeHarnessSummary`. **Ditunda:** UI kaya interaktif di luar JSON statis.
+  - [x] Dokumentasi hub: [`/docs/agent-harness`](apps/cantrik-site/src/routes/docs/agent-harness/+page.svelte); VS Code: `cantrik.writeHarnessSummary`.  
+  - [x] UI interaktif ringkas: [`/dashboard`](apps/cantrik-site/src/routes/dashboard/+page.svelte) — parse JSON `cantrik status --json` di browser (tanpa upload). **Ditunda:** UI kaya (panel VS Code penuh / live attach artefak).
 - [ ] **Self-improvement pada repo Cantrik**  
   - [x] MVP dokumen: profil aman + etika/biaya ([CONTRIBUTING.md](CONTRIBUTING.md) § *Self-improvement (safe profile)*).  
   - [x] Skrip dry-run read-only: [`scripts/self-improve-dry-run.sh`](scripts/self-improve-dry-run.sh).
-  - [x] Gate dokumentasi (fork / review / batas token): [CONTRIBUTING.md](CONTRIBUTING.md) § *Self-improvement*. **Ditunda:** otomatisasi saran patch dengan gate produk penuh di CI.
+  - [x] Gate dokumentasi (fork / review / batas token): [CONTRIBUTING.md](CONTRIBUTING.md) § *Self-improvement*.  
+  - [x] Workflow opsional `workflow_dispatch`: [`.github/workflows/self-improve-gate.yml`](.github/workflows/self-improve-gate.yml) (`cargo test --workspace` + input LLM dry-run). **Ditunda:** otomatisasi saran patch loop + merge otomatis ke `main`.
 - [ ] **Benchmark formal** (SWE-bench / Terminal-Bench)  
   - [x] Baseline: [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh); hook `CANTRIK_BENCH_HARNESS=1`.  
-  - [x] Job workflow_dispatch + langkah placeholder + dataset mini + kebijakan [.bench/README.md](.bench/README.md) ([`.github/workflows/benchmark-harness.yml`](.github/workflows/benchmark-harness.yml)). **Ditunda:** submodule / clone SWE-bench slice + runner terukur.
+  - [x] Job workflow_dispatch + kebijakan [.bench/README.md](.bench/README.md) ([`.github/workflows/benchmark-harness.yml`](.github/workflows/benchmark-harness.yml)): shallow clone SWE-bench ke `.bench/SWE-bench` + stub [`scripts/benchmark-harness-stub.sh`](scripts/benchmark-harness-stub.sh) (smoke `cantrik` tanpa LLM). **Ditunda:** runner benchmark terukur penuh / submodule permanen.
 - [x] **Recipes & templates di cantrik.dev** (MVP registry)  
   - [x] JSON [`static/registry/recipes.json`](apps/cantrik-site/static/registry/recipes.json).  
   - [x] Halaman [`/registry/recipes`](apps/cantrik-site/src/routes/registry/recipes/+page.svelte).  
   - [x] Panduan PR + skema minimal + validasi CI ([CONTRIBUTING.md](CONTRIBUTING.md) § *Registry recipes*, [`scripts/validate-recipes-registry.py`](scripts/validate-recipes-registry.py)).  
-  - [ ] Kurasi editorial / moderasi komunitas skala besar (di luar validasi skema).
+  - [x] Kurasi editorial / moderasi komunitas skala besar (di luar validasi skema) — kebijakan maintainer + opsional `verified` + filter di [`/registry/recipes`](apps/cantrik-site/src/routes/registry/recipes/+page.svelte); [CONTRIBUTING.md](CONTRIBUTING.md) § *Registry recipes*.
 - [ ] **Hybrid SSH / cloud executor**  
   - [x] RFC desain: [`docs/rfc-hybrid-ssh-executor.md`](docs/rfc-hybrid-ssh-executor.md).  
   - [x] MVP CLI: `[remote_exec]` + `cantrik exec --remote` (dry-run) / `--approve` menjalankan `ssh` ([RFC](docs/rfc-hybrid-ssh-executor.md)).  
-  - [x] Dokumentasi sync manual (`rsync`/`scp` + dry-run) di [CONTRIBUTING.md](CONTRIBUTING.md) § Phase 5 triage. **Ditunda:** sync terotomatisasi dengan `--approve`, approval UI khusus, sandbox di sisi remote.
+  - [x] `cantrik sync` dry-run + `--approve` (`rsync` + `[remote_exec].sync_remote_dir`); RFC + [CONTRIBUTING.md](CONTRIBUTING.md) § Phase 5 triage. **Ditunda:** approval UI khusus, sandbox di sisi remote.
 - [ ] **Tree-sitter tambahan** (Kotlin, Swift, …)  
   - [x] Catatan kompatibilitas grammar vs `tree-sitter` workspace: [`docs/tree-sitter-language-extensions.md`](docs/tree-sitter-language-extensions.md).  
   - [x] Bash / shell: `tree-sitter-bash` + indeks `.sh`/`.bash` ([`chunk.rs`](crates/cantrik-core/src/indexing/chunk.rs)).  
-  - [x] CSS: `tree-sitter-css` + indeks `.css`. **Ditunda:** Kotlin, Swift, … per PR terpisah (grammar harus kompatibel TS 0.26+).
+  - [x] CSS: `tree-sitter-css` + indeks `.css`.  
+  - [x] HTML: `tree-sitter-html` + indeks `.html`/`.htm` ([`chunk.rs`](crates/cantrik-core/src/indexing/chunk.rs)). **Ditunda:** Kotlin, Swift, … per PR terpisah (grammar harus kompatibel TS 0.26+).
 - [x] **TUI split pane** — selesai Sprint 18 (`[ui] tui_split_pane`, TASK § Sprint 18). **Ditunda:** panel semantic diff / approval penuh (§6 Enhancement PRD).  
 - [ ] **`cantrik fix` penuh**  
   - [x] `--approve --fetch`, `--run-agents`, `--experiment` (rantai eksperimental, approval eksplisit).  
   - [x] Kebijakan + invariant flag di [CONTRIBUTING.md](CONTRIBUTING.md) + unit test `fix_cmd::validate_fix_flags` / `is_github_issue_url`.  
-  - [x] Integrasi HTTP lokal tanpa LLM: `fix_cmd::fetch_integration` (wiremock). **Ditunda:** skenario fetch terhadap host nyata terpantau / katalog fixture besar.
+  - [x] Integrasi HTTP lokal tanpa LLM: `fix_cmd::fetch_integration` (wiremock) + isi terpin [`tests/fixtures/cantrik-fix-issue-sample.html`](tests/fixtures/cantrik-fix-issue-sample.html); opsional env `CANTRIK_FIX_E2E_HTTP_URL` (lihat [CONTRIBUTING.md](CONTRIBUTING.md) § *SWE constrained workflow*). **Ditunda:** katalog fixture besar / host produksi terpantau di CI utama.
 - [ ] **Sandbox enterprise** (gVisor / Firecracker)  
   - [x] Dokumentasi + arah di [`sandbox.rs`](crates/cantrik-core/src/tool_system/sandbox.rs); level `container` = placeholder.  
   - [x] Hook `CANTRIK_RUNSC_BIN` / opsional `CANTRIK_RUNSC_RUN_ARGS` untuk `sandbox.level = "container"` + dokumentasi admin ([CONTRIBUTING.md](CONTRIBUTING.md)).  
-  - [x] Catatan CI GitHub Actions vs runsc (self-hosted) di CONTRIBUTING. **Ditunda:** job CI runsc otomatis, micro-VM penuh.
+  - [x] Catatan CI GitHub Actions vs runsc (self-hosted) di CONTRIBUTING.  
+  - [x] Workflow opsional: [`.github/workflows/runsc-sandbox-smoke.yml`](.github/workflows/runsc-sandbox-smoke.yml) + variabel repo `CANTRIK_RUNSC_SELF_HOSTED` (lihat CONTRIBUTING). **Ditunda:** micro-VM penuh / gate runsc pada setiap PR.
  
 ---
  

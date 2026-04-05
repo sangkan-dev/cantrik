@@ -1,0 +1,26 @@
+# Optional runsc check on a self-hosted runner. Default branch runs only the documentation step.
+name: runsc sandbox smoke (optional)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  explain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Policy
+        run: |
+          echo "GitHub-hosted runners do not provide gVisor runsc. To exercise runsc in CI:"
+          echo "  1. Add a self-hosted runner with runsc installed."
+          echo "  2. Set repository variable CANTRIK_RUNSC_SELF_HOSTED=true (Settings → Secrets and variables → Actions)."
+          echo "  3. Re-run this workflow. See CONTRIBUTING.md § Enterprise sandbox (gVisor / runsc)."
+          test -f CONTRIBUTING.md
+
+  runsc-version:
+    if: vars.CANTRIK_RUNSC_SELF_HOSTED == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: runsc
+        run: command -v runsc && runsc --version

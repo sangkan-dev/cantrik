@@ -2,7 +2,7 @@
 
 ## Status
 
-**MVP (CLI):** `cantrik exec --remote` prints the `ssh` line from `[remote_exec]` (dry-run); with `--approve` it runs `ssh` locally. Full file sync, sandbox mapping on remote, and product “GA” for enterprise remain **behind review** and tests per this RFC.
+**MVP (CLI):** `cantrik exec --remote` prints the `ssh` line from `[remote_exec]` (dry-run); with `--approve` it runs `ssh` locally. **`cantrik sync`** prints the `rsync -e 'ssh …'` line (with `--dry-run` implied until `--approve`); set `[remote_exec].sync_remote_dir` to the remote directory. Full sandbox mapping on remote and product “GA” for enterprise remain **behind review** and tests per this RFC.
 
 ## Motivation
 
@@ -36,9 +36,10 @@ enabled = false
 host = "build.example.com"
 user = "builder"
 # identity_file = "~/.ssh/id_ed25519"
+# sync_remote_dir = "/home/builder/myproject"   # required for `cantrik sync`
 ```
 
-CLI: `cantrik exec --remote …` (dry-run) and `cantrik exec --remote --approve …` (runs `ssh`). Timeout: `CANTRIK_REMOTE_EXEC_TIMEOUT_SEC` (default 3600).
+CLI: `cantrik exec --remote …` (dry-run) and `cantrik exec --remote --approve …` (runs `ssh`). **`cantrik sync`** / **`cantrik sync --approve`** — rsync local `--src` (default `.`) to `user@host:sync_remote_dir/` using the same `ssh` options. Timeout: `CANTRIK_REMOTE_EXEC_TIMEOUT_SEC` (default 3600) applies to `exec` only today; sync inherits `rsync`/`ssh` defaults.
 
 ## Open questions
 

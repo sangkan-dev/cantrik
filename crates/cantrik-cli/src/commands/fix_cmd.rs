@@ -172,6 +172,47 @@ mod fetch_integration {
             "fix --approve --fetch should succeed against local fixture HTTP"
         );
     }
+
+    /// Regression: body matches checked-in fixture (`tests/fixtures/…`) — stable “pinned” content without live hosts.
+    #[tokio::test]
+    async fn fix_approve_fetch_reaches_fixture_file() {
+        let body = include_str!("../../../../tests/fixtures/cantrik-fix-issue-sample.html");
+        let srv = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(body.to_string()))
+            .mount(&srv)
+            .await;
+
+        let url = format!("{}/issues/99", srv.uri());
+        let cfg = AppConfig::default();
+        let tmp = std::env::temp_dir();
+        let code = run(Path::new(&tmp), &cfg, &url, true, true, false, false).await;
+        assert_eq!(
+            code,
+            ExitCode::SUCCESS,
+            "fix --approve --fetch should succeed when mock serves pinned fixture HTML"
+        );
+    }
+
+    /// When `CANTRIK_FIX_E2E_HTTP_URL` is set, assert `fix --approve --fetch` against that URL (opt-in; not default CI).
+    #[tokio::test]
+    async fn fix_optional_pinned_http_url_from_env() {
+        let Ok(url) = std::env::var("CANTRIK_FIX_E2E_HTTP_URL") else {
+            return;
+        };
+        let url = url.trim();
+        if url.is_empty() {
+            return;
+        }
+        let cfg = AppConfig::default();
+        let tmp = std::env::temp_dir();
+        let code = run(Path::new(&tmp), &cfg, url, true, true, false, false).await;
+        assert_eq!(
+            code,
+            ExitCode::SUCCESS,
+            "fix --approve --fetch against CANTRIK_FIX_E2E_HTTP_URL"
+        );
+    }
 }
 
 #[cfg(test)]

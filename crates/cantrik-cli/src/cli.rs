@@ -113,6 +113,14 @@ pub enum Command {
         #[arg(required = true, trailing_var_arg = true, value_name = "COMMAND")]
         argv: Vec<String>,
     },
+    /// Preview or run `rsync` to `[remote_exec]` (dry-run unless `--approve`). See `docs/rfc-hybrid-ssh-executor.md`.
+    Sync {
+        #[arg(long)]
+        approve: bool,
+        /// Local path to sync (default: current directory). Passed to rsync as source (trailing slash added for directory sync).
+        #[arg(long, value_name = "PATH", default_value = ".")]
+        src: PathBuf,
+    },
     /// Run ripgrep (`rg`) for text search (distinct from vector `search`).
     Rgrep {
         #[arg(required = true, trailing_var_arg = true, value_name = "RG_ARGS")]

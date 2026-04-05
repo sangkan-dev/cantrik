@@ -76,12 +76,14 @@ Untuk menambah entri di [`apps/cantrik-site/static/registry/recipes.json`](apps/
 2. Jalankan `python3 scripts/validate-recipes-registry.py apps/cantrik-site/static/registry/recipes.json` sebelum PR.
 3. PR kecil satu tema (satu batch recipe atau satu perubahan terkait) memudahkan review.
 
+**Kurasi editorial (maintainer):** merge ke registry utama hanya oleh maintainer `sangkan-dev/cantrik` setelah review PR. Tolak atau minta revisi jika: spam / promosi, duplikat `id` atau overlap besar dengan entri ada, `init_template` tidak cocok template [`cantrik init`](crates/cantrik-cli/), atau konten menyesatkan. Field opsional boolean `verified: true` hanya boleh ditambahkan maintainer setelah entri diuji (template init berjalan sesuai deskripsi); kontributor umum tidak perlu mengisi `verified`.
+
 ### Enterprise sandbox (gVisor / runsc)
 
 - Set `sandbox.level = "container"` **hanya** jika operator siap: butuh biner `runsc` dan kebijakan host.
 - Set env `CANTRIK_RUNSC_BIN` ke path `runsc`. Opsional: `CANTRIK_RUNSC_RUN_ARGS` — token dipisah spasi yang disisipkan setelah `runsc run` (contoh: `--network=none` jika didukung setup Anda).
 - Tanpa env tersebut, level `container` gagal dengan pesan jelas (lebih aman daripada mengeksekusi tanpa isolasi yang dimaksud).
-- **CI:** runner GitHub Actions default tidak menyediakan `runsc` atau izin privileged; gunakan runner self-hosted atau abaikan job khusus sampai kebijakan infra jelas. Validasi lokal dengan `CANTRIK_RUNSC_BIN` tetap menjadi tanggung jawab operator.
+- **CI:** runner GitHub Actions default tidak menyediakan `runsc` atau izin privileged; gunakan runner self-hosted atau abaikan job khusus sampai kebijakan infra jelas. Validasi lokal dengan `CANTRIK_RUNSC_BIN` tetap menjadi tanggung jawab operator. Workflow opsional (manual): [`.github/workflows/runsc-sandbox-smoke.yml`](.github/workflows/runsc-sandbox-smoke.yml) — set variabel repo `CANTRIK_RUNSC_SELF_HOSTED=true` hanya jika runner self-hosted dengan `runsc` tersedia.
 
 ### Desktop tray (Tauri) — file flag approval
 
@@ -100,6 +102,7 @@ Menjalankan Cantrik pada **repo Cantrik sendiri** untuk saran perbaikan:
 - Otomatisasi penuh “self-rewrite” tetap di backlog hingga ada gate produk (tes, approval, rollback).
 - **Dry-run skrip:** [`scripts/self-improve-dry-run.sh`](scripts/self-improve-dry-run.sh) menjalankan satu `cantrik ask` read-only pada repo (tanpa `--approve`); gunakan sebagai langkah manual sebelum otomasi patch.
 - **Gate sebelum otomasi patch (MVP):** wajibkan dry-run + review manusia pada diff; batasi konteks/token di config; otomasi PR hanya dari **fork** atau branch eksperimen; tidak ada loop tanpa henti tanpa human-in-the-loop.
+- **CI opsional (fork / manual):** [`.github/workflows/self-improve-gate.yml`](.github/workflows/self-improve-gate.yml) — `workflow_dispatch`: gate `cargo test --workspace`; centang input `run_llm_dry_run` untuk menjalankan skrip dry-run setelah build (butuh kunci provider di runner).
 
 ### SWE constrained workflow (manual checklist)
 
@@ -110,7 +113,7 @@ Alur terbatas untuk satu issue publik + satu repo lokal:
 3. Opsional: `--experiment` — masih membutuhkan `--approve`; menjalankan mode experiment (writes + tes + revert) — review diff sebelum commit.
 4. `cantrik pr create --approve` atau alur Git manual; tidak ada jaminan “high reliability” sampai ada tes integrasi produk.
 
-**Kebijakan / QA produk (rantai `fix`):** flag `--run-agents` / `--run-experiment` wajib dipasangkan dengan `--approve` dan `--fetch`; invariant ini dites di unit test (`fix_cmd::validate_fix_flags`). Tes integrasi **tanpa LLM**: `fix_cmd::fetch_integration::fix_approve_fetch_reaches_local_http` (wiremock) + workflow [`.github/workflows/swe-e2e-smoke.yml`](.github/workflows/swe-e2e-smoke.yml).
+**Kebijakan / QA produk (rantai `fix`):** flag `--run-agents` / `--run-experiment` wajib dipasangkan dengan `--approve` dan `--fetch`; invariant ini dites di unit test (`fix_cmd::validate_fix_flags`). Tes integrasi **tanpa LLM**: wiremock + HTML dari berkas terversion [`tests/fixtures/cantrik-fix-issue-sample.html`](tests/fixtures/cantrik-fix-issue-sample.html) (`fix_approve_fetch_reaches_fixture_file`) + workflow [`.github/workflows/swe-e2e-smoke.yml`](.github/workflows/swe-e2e-smoke.yml). **Opsional (jaringan):** set env `CANTRIK_FIX_E2E_HTTP_URL` ke URL statis terpin (mis. raw GitHub ke file fixture) lalu jalankan `cargo test -p cantrik-cli fix_optional_pinned_http_url_from_env` — tidak diwajibkan di CI utama (bisa rapuh bila URL berubah).
 
 **Definisi “high reliability” (SWE otonom penuh):** lihat template issue [SWE E2E reliability](.github/ISSUE_TEMPLATE/swe_e2e_reliability.md) — minimal satu skenario E2E terotomatisasi sebelum mengklaim item backlog terkait selesai.
 
@@ -118,7 +121,7 @@ Alur terbatas untuk satu issue publik + satu repo lokal:
 
 - **Tree-sitter:** lihat [`docs/tree-sitter-language-extensions.md`](docs/tree-sitter-language-extensions.md) (kompatibilitas grammar vs versi `tree-sitter` workspace); satu bahasa per PR.
 - **Sandbox enterprise (gVisor / Firecracker):** titik masuk ada di `crates/cantrik-core/src/tool_system/sandbox.rs`; butuh desain admin + CI khusus.
-- **Hybrid SSH / cloud executor:** RFC [`docs/rfc-hybrid-ssh-executor.md`](docs/rfc-hybrid-ssh-executor.md); MVP CLI: `cantrik exec --remote` + `[remote_exec]`. **Sync workspace (manual dulu):** gunakan `rsync`/`scp` dengan `--dry-run` lalu review; setelah tree remote cocok, jalankan `cantrik exec --remote --approve -- …` di host tujuan. Otomatisasi sync dengan `--approve` = backlog terpisah (RFC).
+- **Hybrid SSH / cloud executor:** RFC [`docs/rfc-hybrid-ssh-executor.md`](docs/rfc-hybrid-ssh-executor.md); MVP CLI: `cantrik exec --remote` + `[remote_exec]`. **Sync:** `cantrik sync` mencetak perintah `rsync` (mode `--dry-run` bawaan); `cantrik sync --approve` menjalankan rsync setelah review. Set `[remote_exec].sync_remote_dir`. Manual `rsync`/`scp` tetap didukung untuk alur kustom.
 - **Benchmark SWE-bench / Terminal-Bench:** skrip baseline [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh) (quality gates + hook `CANTRIK_BENCH_HARNESS=1`); demo alur terbatas [`scripts/swe-fix-demo.sh`](scripts/swe-fix-demo.sh) dengan `ISSUE_URL=…`.
 - **`cantrik fix` / agents:** `cantrik fix URL --approve --fetch --run-agents` (+ timeout `CANTRIK_FIX_AGENT_TIMEOUT_SEC`); `--run-experiment` merantai mode experiment; `cantrik agents "…" --reflect` = satu putaran reviewer LLM.
 - **Agent harness artefak:** `cantrik status --write-harness-summary` menulis `.cantrik/session-harness-summary.json` (payload job + `generated_at_unix`) untuk di-attach ke CI atau dashboard eksternal.

@@ -11,21 +11,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install protoc + bubblewrap + ripgrep
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler bubblewrap ripgrep
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Shallow clone SWE-bench (read-only slice)
+        run: |
+          git clone --depth 1 https://github.com/princeton-nlp/SWE-bench.git .bench/SWE-bench
+          test -f .bench/SWE-bench/README.md
+
       - name: Mini dataset directory (placeholder)
         run: |
           mkdir -p .bench/minimal
-          echo "# Bench placeholder — replace with submodule or fetch of SWE-bench / Terminal-Bench slice." > .bench/minimal/README.md
+          echo "# Bench placeholder — Terminal-Bench / custom slices can live alongside SWE-bench." > .bench/minimal/README.md
           test -f .bench/minimal/README.md
 
       - name: Bench policy (repo docs)
         run: test -f .bench/README.md && sed -n '1,12p' .bench/README.md
 
+      - name: Stub runner (non-LLM cantrik tests)
+        run: bash scripts/benchmark-harness-stub.sh
+
       - name: Document local baseline
         run: |
           echo "Local baseline: ./scripts/phase5-smoke.sh"
           echo "Optional env when wiring an external runner: CANTRIK_BENCH_HARNESS=1"
-          echo "Full cantrik build + bench execution belongs here in a follow-up iteration."
 
       - name: Success
         run: |
-          echo "benchmark-harness: placeholder OK (exit 0)"
+          echo "benchmark-harness: clone + stub OK (exit 0)"

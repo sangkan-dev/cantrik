@@ -22,5 +22,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Run fix fetch integration test
-        run: cargo test -p cantrik-cli fetch_integration::fix_approve_fetch_reaches_local_http -- --exact --nocapture
+      - name: Run fix fetch integration test (wiremock, no LLM)
+        run: cargo test -p cantrik-cli fix_approve_fetch_reaches_local_http -- --exact --nocapture
+
+      - name: Fix command unit tests (flags / URL parsing, no network)
+        run: cargo test -p cantrik-cli fix_cmd::tests -- --nocapture
+
+      - name: Fix fetch uses checked-in HTML fixture (wiremock, no LLM)
+        run: cargo test -p cantrik-cli fix_approve_fetch_reaches_fixture_file -- --exact --nocapture

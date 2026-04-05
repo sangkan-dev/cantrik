@@ -28,6 +28,7 @@
 			<a class="text-ash hover:text-gold" href={resolve('/registry')}>Plugin registry</a>
 			<a class="text-ash hover:text-gold" href={resolve('/registry/recipes')}>Recipes</a>
 			<a class="text-ash hover:text-gold" href={resolve('/dashboard')}>Dashboard</a>
+			<a class="text-ash hover:text-gold" href={resolve('/docs/agent-harness')}>Harness</a>
 			<a
 				class="text-ash hover:text-gold"
 				href="https://github.com/sangkan-dev/cantrik"

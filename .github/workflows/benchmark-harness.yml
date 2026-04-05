@@ -17,6 +17,9 @@ jobs:
           echo "# Bench placeholder — replace with submodule or fetch of SWE-bench / Terminal-Bench slice." > .bench/minimal/README.md
           test -f .bench/minimal/README.md
 
+      - name: Bench policy (repo docs)
+        run: test -f .bench/README.md && sed -n '1,12p' .bench/README.md
+
       - name: Document local baseline
         run: |
           echo "Local baseline: ./scripts/phase5-smoke.sh"
@@ -24,4 +27,5 @@ jobs:
           echo "Full cantrik build + bench execution belongs here in a follow-up iteration."
 
       - name: Success
-        run: echo "benchmark-harness: placeholder OK (exit 0)"
+        run: |
+          echo "benchmark-harness: placeholder OK (exit 0)"

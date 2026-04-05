@@ -140,6 +140,40 @@ pub async fn run(
     ExitCode::SUCCESS
 }
 
+/// Local HTTP fixture for CI: `fix --approve --fetch` without LLM agents.
+#[cfg(test)]
+mod fetch_integration {
+    use std::path::Path;
+    use std::process::ExitCode;
+
+    use cantrik_core::config::AppConfig;
+    use wiremock::matchers::method;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    use super::run;
+
+    #[tokio::test]
+    async fn fix_approve_fetch_reaches_local_http() {
+        let srv = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(
+                "<html><head><title>Fixture issue</title></head><body>ok</body></html>",
+            ))
+            .mount(&srv)
+            .await;
+
+        let url = format!("{}/issues/1", srv.uri());
+        let cfg = AppConfig::default();
+        let tmp = std::env::temp_dir();
+        let code = run(Path::new(&tmp), &cfg, &url, true, true, false, false).await;
+        assert_eq!(
+            code,
+            ExitCode::SUCCESS,
+            "fix --approve --fetch should succeed against local fixture HTTP"
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

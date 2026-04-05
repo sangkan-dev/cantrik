@@ -1,0 +1,26 @@
+# Regression smoke: `cantrik fix --approve --fetch` against a local HTTP fixture (no LLM).
+name: SWE E2E smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "crates/cantrik-cli/**"
+      - "crates/cantrik-core/**"
+      - ".github/workflows/swe-e2e-smoke.yml"
+
+jobs:
+  fix-fetch-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install protoc + bubblewrap + ripgrep
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler bubblewrap ripgrep
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run fix fetch integration test
+        run: cargo test -p cantrik-cli fetch_integration::fix_approve_fetch_reaches_local_http -- --exact --nocapture

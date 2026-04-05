@@ -9,6 +9,9 @@ include = ["src/**", "templates/**", "Cargo.toml"]
 name = "cantrik"
 path = "src/main.rs"
 
+[dev-dependencies]
+wiremock = "0.6"
+
 [dependencies]
 cantrik-core = { path = "../cantrik-core" }
 clap.workspace = true

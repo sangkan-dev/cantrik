@@ -23,6 +23,7 @@ pub(super) enum Lang {
     Yaml,
     Markdown,
     Bash,
+    Css,
 }
 
 impl Lang {
@@ -45,6 +46,7 @@ impl Lang {
             Lang::Yaml => "yaml",
             Lang::Markdown => "markdown",
             Lang::Bash => "bash",
+            Lang::Css => "css",
         }
     }
 
@@ -67,6 +69,7 @@ impl Lang {
             Lang::Yaml => tree_sitter_yaml::LANGUAGE.into(),
             Lang::Markdown => tree_sitter_md::LANGUAGE.into(),
             Lang::Bash => tree_sitter_bash::LANGUAGE.into(),
+            Lang::Css => tree_sitter_css::LANGUAGE.into(),
         }
     }
 
@@ -191,6 +194,14 @@ impl Lang {
 (function_definition name: (word) @name) @chunk
 "
             }
+            Lang::Css => {
+                r"
+(rule_set
+  (selectors (class_selector (class_name) @name))) @chunk
+(rule_set
+  (selectors (id_selector (id_name) @name))) @chunk
+"
+            }
         }
     }
 
@@ -223,6 +234,7 @@ pub(super) fn detect_language(rel_path: &str) -> Option<Lang> {
         "yaml" | "yml" => Lang::Yaml,
         "md" | "markdown" => Lang::Markdown,
         "sh" | "bash" => Lang::Bash,
+        "css" => Lang::Css,
         _ => return None,
     })
 }
@@ -371,6 +383,13 @@ mod tests {
         let src = "foo() { echo hi; }\n";
         let (_, chunks) = extract_chunks("x.sh", src.as_bytes()).unwrap();
         assert!(chunks.iter().any(|c| c.symbol == "foo"));
+    }
+
+    #[test]
+    fn chunk_css_class_rule() {
+        let src = ".btn { color: red; }\n";
+        let (_, chunks) = extract_chunks("x.css", src.as_bytes()).unwrap();
+        assert!(chunks.iter().any(|c| c.symbol == "btn"));
     }
 
     #[test]

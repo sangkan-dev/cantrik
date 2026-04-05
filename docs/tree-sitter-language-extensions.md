@@ -20,6 +20,10 @@ The popular `tree-sitter-kotlin` crate (0.3.8) currently pins `tree-sitter` to *
 
 `tree-sitter-bash` (see `crates/cantrik-core/Cargo.toml`) is wired for `.sh` / `.bash` in [`chunk.rs`](../crates/cantrik-core/src/indexing/chunk.rs); follow the same checklist for future grammars.
 
+## CSS
+
+`tree-sitter-css` indexes `.css` files (class/id `rule_set` chunks) in the same module.
+
 ## References
 
 - Internal indexer entrypoint: [`indexing/mod.rs`](../crates/cantrik-core/src/indexing/mod.rs)

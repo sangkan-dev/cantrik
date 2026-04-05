@@ -80,6 +80,10 @@
       {
         "command": "cantrik.runInWorkspace",
         "title": "Cantrik: Run in workspace folder (doctor)"
+      },
+      {
+        "command": "cantrik.writeHarnessSummary",
+        "title": "Cantrik: Write session harness summary (.cantrik/)"
       }
     ]
   },

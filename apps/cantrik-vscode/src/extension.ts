@@ -163,6 +163,10 @@ type TreeCmd = { label: string; command: string; args?: string[] };
 const TREE_ITEMS: TreeCmd[] = [
   { label: "Doctor", command: "cantrik.doctor" },
   { label: "Doctor (workspace cwd)", command: "cantrik.runInWorkspace" },
+  {
+    label: "Write harness summary",
+    command: "cantrik.writeHarnessSummary",
+  },
   { label: "Health (audit only)", command: "cantrik.health" },
   { label: "Version", command: "cantrik.version" },
   { label: "Start LSP", command: "cantrik.startLsp" },
@@ -230,6 +234,18 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
       runCantrikCapture(["doctor"], "cantrik doctor (workspace)", { cwd: root });
+    }),
+    vscode.commands.registerCommand("cantrik.writeHarnessSummary", () => {
+      const root = workspaceRoot();
+      if (!root) {
+        void vscode.window.showErrorMessage("Open a workspace folder first.");
+        return;
+      }
+      runCantrikCapture(
+        ["status", "--write-harness-summary"],
+        "cantrik status --write-harness-summary",
+        { cwd: root }
+      );
     }),
     vscode.commands.registerCommand("cantrik.health", () => {
       const root = workspaceRoot();

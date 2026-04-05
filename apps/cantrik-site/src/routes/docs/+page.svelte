@@ -30,6 +30,11 @@
 				rel="noreferrer">Contributing</a
 			>
 		</li>
+		<li>
+			<a class="text-gold hover:text-gold-bright" href={resolve('/docs/agent-harness')}
+				>Agent harness (JSON / CI)</a
+			>
+		</li>
 	</ul>
 	<p class="mt-10 font-mono text-sm">
 		<a class="text-gold hover:text-gold-bright" href={resolve('/')}>Back home</a>

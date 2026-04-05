@@ -23,10 +23,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Fix fetch integration suite (wiremock, redirect, mini workspace, no LLM)
-        run: cargo test -p cantrik-cli commands::fix_cmd::fetch_integration:: -- --nocapture
+        run: "cargo test -p cantrik-cli commands::fix_cmd::fetch_integration:: -- --nocapture"
 
       - name: Fix command unit tests (flags / URL parsing, no network)
-        run: cargo test -p cantrik-cli fix_cmd::tests -- --nocapture
+        run: "cargo test -p cantrik-cli fix_cmd::tests -- --nocapture"
 
       - name: Validate fixtures catalog.json
         run: python3 -c "import json; json.load(open('tests/fixtures/catalog.json'))"

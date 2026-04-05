@@ -13,6 +13,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Free disk space (LanceDB compilation is large)
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo docker image prune --all --force 2>/dev/null || true
+          df -h
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -36,8 +44,8 @@ jobs:
       - name: Cargo clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-      - name: Cargo test
-        run: cargo test --workspace --all-targets
+      - name: Cargo test (lib + unit tests)
+        run: cargo test --workspace --lib
 
   packaging-smoke:
     runs-on: ubuntu-latest

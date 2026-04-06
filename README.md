@@ -1,5 +1,9 @@
 # Cantrik
 
+<p align="center">
+  <img src="docs/assets/cantrik-logo.png" alt="Cantrik — CLI AI assistant" width="420">
+</p>
+
 > **Cantrik** (ꦕꦤ꧀ꦠꦿꦶꦏ꧀) — Open-Source AI CLI Agent berbasis Rust
 
 Cantrik adalah CLI agent yang memahami struktur codebase Anda secara semantik, menggunakan LLM multi-provider dengan kemampuan:

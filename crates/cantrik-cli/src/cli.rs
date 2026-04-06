@@ -191,6 +191,11 @@ pub enum Command {
         #[command(subcommand)]
         sub: SkillCommand,
     },
+    /// List or show entries from the static extension catalog (same JSON as the hub; bundled in the binary).
+    Registry {
+        #[command(subcommand)]
+        sub: RegistryCommand,
+    },
     /// Record and replay command sequences (Sprint 13, PRD §4.18).
     Macro {
         #[command(subcommand)]
@@ -401,6 +406,23 @@ pub enum Command {
     /// Anything that is not a known subcommand is treated as a one-shot `ask` prompt (PRD: `cantrik "..."`).
     #[command(external_subcommand)]
     External(Vec<OsString>),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum RegistryCommand {
+    /// Print all extension ids (tab-separated with kind and name).
+    List {
+        /// Path to `extensions.json` instead of the catalog bundled with this binary.
+        #[arg(long, value_name = "PATH")]
+        file: Option<PathBuf>,
+    },
+    /// Print one extension by id (description, source, install hint).
+    Show {
+        #[arg(value_name = "ID")]
+        id: String,
+        #[arg(long, value_name = "PATH")]
+        file: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Subcommand)]

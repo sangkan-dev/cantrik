@@ -30,6 +30,7 @@ export const docsNavTree: DocNavEntry[] = [
 		]
 	},
 	{ href: '/docs/safety', label: 'Safety & approve' },
+	{ href: '/docs/extensions', label: 'Peta ekosistem' },
 	{ href: '/docs/registry', label: 'Registry & recipes' },
 	{ href: '/docs/agent-harness', label: 'Agent harness (CI)' }
 ];

@@ -49,7 +49,7 @@
 	{/if}
 
 	<p class="mt-10 flex flex-wrap gap-4 font-mono text-sm">
-		<a class="text-gold hover:text-gold-bright" href={resolve('/registry')}>Plugin registry</a>
+		<a class="text-gold hover:text-gold-bright" href={resolve('/registry')}>Extension registry</a>
 		<a class="text-gold hover:text-gold-bright" href={resolve('/dashboard')}>Dashboard</a>
 		<a class="text-gold hover:text-gold-bright" href={resolve('/')}>Home</a>
 	</p>

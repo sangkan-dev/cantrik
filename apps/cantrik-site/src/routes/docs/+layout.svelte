@@ -42,6 +42,7 @@
 			begawan: 'Begawan',
 			'semantic-index': 'Semantic index',
 			safety: 'Safety',
+			extensions: 'Peta ekosistem',
 			registry: 'Registry',
 			'agent-harness': 'Agent harness'
 		};

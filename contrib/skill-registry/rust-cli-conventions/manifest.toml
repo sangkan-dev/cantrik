@@ -1,0 +1,3 @@
+name = "rust-cli-conventions"
+version = "0.1.0"
+files = ["skills/rust-cli-style.md"]

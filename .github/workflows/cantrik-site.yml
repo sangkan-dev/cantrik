@@ -5,10 +5,12 @@ on:
     branches: ["main", "master"]
     paths:
       - "apps/cantrik-site/**"
+      - "scripts/validate-extensions-registry.py"
       - ".github/workflows/cantrik-site.yml"
   pull_request:
     paths:
       - "apps/cantrik-site/**"
+      - "scripts/validate-extensions-registry.py"
       - ".github/workflows/cantrik-site.yml"
 
 jobs:
@@ -19,6 +21,8 @@ jobs:
         working-directory: apps/cantrik-site
     steps:
       - uses: actions/checkout@v4
+      - name: Validate extensions registry JSON
+        run: python3 scripts/validate-extensions-registry.py apps/cantrik-site/static/registry/extensions.json
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

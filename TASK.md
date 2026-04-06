@@ -361,9 +361,26 @@ default_model = "llama-3.3-70b-versatile"
 **DoD gap (audit):** [DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md) Phase 4 mensyaratkan binary GitHub Releases untuk Linux x86_64/aarch64 + macOS x86_64/aarch64; [`.github/workflows/release.yml`](.github/workflows/release.yml) saat ini hanya Linux x86_64. Untuk gate **GA** ketat, perlu perluasan matrix atau penyesuaian DoD — lihat [docs/DOD_VERIFICATION_MATRIX.md](docs/DOD_VERIFICATION_MATRIX.md).
  
 **Definition of Done:** Rilis alpha publik + dokumentasi kontribusi + salah satu saluran distribusi utama aktif.
- 
+
 ---
- 
+
+## Sprint 20 — Registry ekosistem & aktivasi (Phase 4 lanjutan)
+
+**Goal:** Hub + CLI + docs menjawab “mau pakai skill / rules / plugin / MCP dari mana dan cara aktifkan?” — tetap statis JSON + PR (tanpa marketplace/auth), selaras rencana registry terpadu.
+
+- [x] **Skema `extensions.json`** — [`apps/cantrik-site/static/registry/extensions.json`](apps/cantrik-site/static/registry/extensions.json): `kind` (`skill_pack` | `lua_plugin` | `wasm_plugin` | `mcp_preset` | `recipe_ref`), `id`, `name`, `description`, `source`, `install_hint`; opsional `verified`, `recipe_id`.
+- [x] **Validasi CI** — [`scripts/validate-extensions-registry.py`](scripts/validate-extensions-registry.py) + langkah di [`.github/workflows/ci.yml`](.github/workflows/ci.yml) dan [`.github/workflows/cantrik-site.yml`](.github/workflows/cantrik-site.yml).
+- [x] **Docs peta ekosistem** — [`/docs/extensions`](apps/cantrik-site/src/routes/docs/extensions/+page.svelte): rules vs skills vs plugin vs MCP (bahasa sederhana); nav di [`docsNav.ts`](apps/cantrik-site/src/lib/docsNav.ts).
+- [ ] **Hub `/registry`** — filter/tab by `kind`, kartu + salin `install_hint`, tautan ke docs + recipes; loader baca `extensions.json` ([`+page.ts`](apps/cantrik-site/src/routes/registry/+page.ts)).
+- [x] **CLI `cantrik registry`** — `list` / `show <id>` — baca JSON bawaan repo (include) + opsi `--file`; tanpa unduh otomatis dari internet di MVP ini.
+- [x] **CONTRIBUTING** — § *Registry extensions* (kontributor entri, PR kecil, jalankan validator).
+
+**Batas MVP Sprint 20:** Tidak ada `skill install --from-registry` / unduhan arsip dari URL di CLI (gate keamanan terpisah). `plugins.json` boleh ditinggal sebagai legacy atau diarahkan ke dokumentasi `extensions.json`.
+
+**Definition of Done:** CI hijau; halaman hub dan docs bisa dipakai pengguna baru; `cantrik registry list` menampilkan entri yang sama dengan hub.
+
+---
+
 ## Backlog — Phase 4 lanjutan & Phase 5
  
 **Foundation (iterasi backlog, bukan penutup checklist):** tabel *Network surfaces* + blok HTTP saat offline; `cantrik health --tree` / `--outdated` / `--coverage` / `--deny` / `--audit` (opsional); artefak [`packaging/arch`](packaging/arch/PKGBUILD), [`packaging/nix`](packaging/nix/flake.nix), [`packaging/winget`](packaging/winget/Sangkan.Cantrik.yaml); CI [`winget validate`](.github/workflows/winget-validate.yml); panel VS Code + setting `cantrik.executablePath` + webview `status --json`; [`apps/cantrik-tauri`](apps/cantrik-tauri/) tray + polling flag; `cantrik fix` + `--run-agents` / `--run-experiment`; `cantrik status --json`; `cantrik agents --reflect`; [`/dashboard`](apps/cantrik-site/src/routes/dashboard/+page.svelte) + [`/registry/recipes`](apps/cantrik-site/src/routes/registry/recipes/+page.svelte); [`static/registry/recipes.json`](apps/cantrik-site/static/registry/recipes.json); [`scripts/phase5-smoke.sh`](scripts/phase5-smoke.sh) + [`scripts/swe-fix-demo.sh`](scripts/swe-fix-demo.sh); ringkasan `plan --run` → [`.cantrik/plan-run-summary.json`](crates/cantrik-cli/src/commands/plan.rs).

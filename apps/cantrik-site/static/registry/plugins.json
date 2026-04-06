@@ -5,7 +5,7 @@
 			"id": "example-placeholder",
 			"name": "Example plugin (placeholder)",
 			"repo": "https://github.com/sangkan-dev/cantrik",
-			"description": "Registry MVP — submit plugins via GitHub discussion or PR to this list."
+			"description": "Legacy list — lihat /registry/extensions.json dan halaman /registry untuk katalog terpadu (kind: skill_pack, lua_plugin, wasm_plugin, mcp_preset, recipe_ref)."
 		}
 	]
 }

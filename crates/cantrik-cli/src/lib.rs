@@ -12,8 +12,9 @@ use cantrik_core::config::{load_merged_config, resolve_config_paths};
 use clap::Parser;
 
 pub use cli::{
-    Cli, Command, CompletionShell, FileCommand, MacroCommand, McpCommand, PrCommand, ReplayCommand,
-    SessionCommand, SkillCommand, TeachFormatArg, VisualizeCliKind, WebCommand, WorkspaceCommand,
+    Cli, Command, CompletionShell, FileCommand, MacroCommand, McpCommand, PrCommand,
+    RegistryCommand, ReplayCommand, SessionCommand, SkillCommand, TeachFormatArg, VisualizeCliKind,
+    WebCommand, WorkspaceCommand,
 };
 
 const STDIN_MAX_BYTES: u64 = 4 * 1024 * 1024;
@@ -102,6 +103,7 @@ pub async fn run() -> ExitCode {
             SkillCommand::Remove { name } => commands::skill_cmd::remove(&cwd, name),
             SkillCommand::Update { name } => commands::skill_cmd::update(&cwd, name),
         },
+        Some(Command::Registry { sub }) => commands::registry_cmd::run(sub),
         Some(Command::Macro { sub }) => match sub {
             MacroCommand::Record { label } => commands::macro_cmd::record(&cwd, label),
             MacroCommand::Add { args } => commands::macro_cmd::add(&cwd, args),
@@ -827,6 +829,35 @@ mod tests {
                 assert_eq!(path, &std::path::PathBuf::from("/tmp/x"));
             }
             _ => panic!("expected init"),
+        }
+    }
+
+    #[test]
+    fn parse_registry_list_show() {
+        let cli = Cli::try_parse_from(["cantrik", "registry", "list"]).expect("parse");
+        assert!(matches!(
+            cli.cmd,
+            Some(Command::Registry {
+                sub: RegistryCommand::List { file: None }
+            })
+        ));
+        let cli = Cli::try_parse_from([
+            "cantrik",
+            "registry",
+            "show",
+            "example-skill-pack",
+            "--file",
+            "/tmp/x.json",
+        ])
+        .expect("parse");
+        match cli.cmd.expect("cmd") {
+            Command::Registry {
+                sub: RegistryCommand::Show { id, file },
+            } => {
+                assert_eq!(id, "example-skill-pack");
+                assert_eq!(file, Some(std::path::PathBuf::from("/tmp/x.json")));
+            }
+            _ => panic!("expected registry show"),
         }
     }
 

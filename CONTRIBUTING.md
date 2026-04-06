@@ -78,6 +78,23 @@ Untuk menambah entri di [`apps/cantrik-site/static/registry/recipes.json`](apps/
 
 **Kurasi editorial (maintainer):** merge ke registry utama hanya oleh maintainer `sangkan-dev/cantrik` setelah review PR. Tolak atau minta revisi jika: spam / promosi, duplikat `id` atau overlap besar dengan entri ada, `init_template` tidak cocok template [`cantrik init`](crates/cantrik-cli/), atau konten menyesatkan. Field opsional boolean `verified: true` hanya boleh ditambahkan maintainer setelah entri diuji (template init berjalan sesuai deskripsi); kontributor umum tidak perlu mengisi `verified`.
 
+### Registry extensions (komunitas)
+
+Untuk menambah atau mengubah entri di [`apps/cantrik-site/static/registry/extensions.json`](apps/cantrik-site/static/registry/extensions.json):
+
+1. Fork + branch; setiap objek di `extensions` wajib punya string non-kosong: `id`, `name`, `description`, `kind`, `source` (URL `http`/`https`), `install_hint`.
+2. Nilai `kind` hanya salah satu dari: `skill_pack`, `lua_plugin`, `wasm_plugin`, `mcp_preset`, `recipe_ref`.
+3. Untuk `kind: "recipe_ref"`, wajib ada `recipe_id` (string) yang cocok dengan `id` di [`recipes.json`](apps/cantrik-site/static/registry/recipes.json) bila merujuk recipe di hub yang sama.
+4. Opsional: `verified: true` (boolean) — **hanya maintainer** setelah entri diuji, sama seperti recipes.
+5. Jalankan `python3 scripts/validate-extensions-registry.py apps/cantrik-site/static/registry/extensions.json` sebelum PR.
+6. PR kecil satu tema (satu batch entri atau satu perubahan terkait) memudahkan review; setelah merge, jalankan `cargo build -p cantrik-cli` agar binary menyematkan JSON terbaru (`cantrik registry list`).
+
+**Contoh PR minimal:** tambah satu entri `mcp_preset` dengan `install_hint` yang bisa disalin pengguna ke `providers.toml` (tanpa perintah berbahaya), `source` menunjuk dokumentasi atau kode referensi di repo.
+
+**Skill pack di repo:** paket contoh siap salin ada di [`contrib/skill-registry/`](contrib/skill-registry/) (masing-masing `manifest.toml` + `skills/*.md`). Entri `skill_pack` di hub yang merujuk ke sana harus memakai `install_hint` yang konsisten (`cp -r …` ke share dir lalu `cantrik skill install`).
+
+**Kurasi editorial (maintainer):** tolak atau minta revisi jika: URL sumber tidak wajar, duplikat `id`, `install_hint` mengeksekusi kode sewenang-wenang tanpa konteks jelas, atau overlap besar dengan entri ada. MVP tidak menyertakan unduhan otomatis dari registry di CLI; entri bersifat dokumentasi + salin-tempel.
+
 ### Dokumentasi pengguna (cantrik-site)
 
 - **URL kanonik:** dokumentasi ramai pengguna dipublikasikan di **`https://cantrik.sangkan.dev/docs`** (sumber konten: [`apps/cantrik-site/src/routes/docs/`](apps/cantrik-site/src/routes/docs/), halaman SvelteKit + `+page.svelte`).

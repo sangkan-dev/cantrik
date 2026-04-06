@@ -64,3 +64,6 @@ jobs:
 
       - name: Recipes registry JSON schema (minimal)
         run: python3 scripts/validate-recipes-registry.py apps/cantrik-site/static/registry/recipes.json
+
+      - name: Extensions registry JSON schema (minimal)
+        run: python3 scripts/validate-extensions-registry.py apps/cantrik-site/static/registry/extensions.json

@@ -4,7 +4,10 @@
 
 <svelte:head>
 	<title>Registry dan recipes - Dokumentasi Cantrik</title>
-	<meta name="description" content="Plugin registry dan recipes Cantrik di hub situs." />
+	<meta
+		name="description"
+		content="Extension registry, recipes, dan peta ekosistem Cantrik di dokumentasi hub."
+	/>
 </svelte:head>
 
 <article
@@ -13,15 +16,19 @@
 	<h1>Registry dan recipes</h1>
 
 	<p class="font-mono text-sm text-ash">
-		<strong class="text-gold-dim">Satu kalimat:</strong> hub ini punya
-		<strong>registry plugin</strong>
-		(MVP) dan
-		<strong>recipes</strong> sebagai titik awal konten komunitas.
+		<strong class="text-gold-dim">Satu kalimat:</strong> hub punya
+		<strong>katalog ekstensi</strong> (skill pack, plugin, MCP preset, rujukan recipe), plus
+		<strong>recipes</strong> untuk <code>cantrik init</code>.
 	</p>
 
 	<ul class="font-mono text-sm">
 		<li>
-			<a class="text-gold hover:text-gold-bright" href={resolve('/registry')}>Plugin registry</a>
+			<a class="text-gold hover:text-gold-bright" href={resolve('/docs/extensions')}
+				>Peta ekosistem (rules / skills / plugin / MCP)</a
+			>
+		</li>
+		<li>
+			<a class="text-gold hover:text-gold-bright" href={resolve('/registry')}>Extension registry</a>
 		</li>
 		<li>
 			<a class="text-gold hover:text-gold-bright" href={resolve('/registry/recipes')}>Recipes</a>

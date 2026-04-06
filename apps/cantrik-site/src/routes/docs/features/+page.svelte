@@ -52,9 +52,9 @@
 		<li><strong>Sandbox</strong> - eksekusi terbatas; lihat Safety.</li>
 		<li><strong>MCP, plugin Lua/WASM, registry</strong> - ekosistem perluasan.</li>
 		<li>
-			<strong>Plugin registry</strong> di hub: <SoundLink
+			<strong>Extension registry</strong> di hub: <SoundLink
 				class="text-gold"
-				href={resolve('/registry')}>Registry</SoundLink
+				href={resolve('/registry')}>/registry</SoundLink
 			>.
 		</li>
 	</ul>

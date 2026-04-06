@@ -1,0 +1,166 @@
+{
+	"schema_version": 1,
+	"extensions": [
+		{
+			"id": "example-skill-pack",
+			"name": "Contoh skill pack (lokal)",
+			"description": "Paket skill .md di ~/.local/share/cantrik/skill-registry/<nama>/ — dipasang ke .cantrik/skills/ lewat cantrik skill install.",
+			"kind": "skill_pack",
+			"source": "https://github.com/sangkan-dev/cantrik/tree/main/crates/cantrik-cli/src/commands/skill_cmd.rs",
+			"install_hint": "Letakkan manifest + file di ~/.local/share/cantrik/skill-registry/<nama>/ lalu: cantrik skill install <nama>"
+		},
+		{
+			"id": "contrib-demo-skill",
+			"name": "Skill demo (siap pakai dari repo)",
+			"description": "Satu file contoh di contrib; cocok untuk uji cantrik skill install end-to-end.",
+			"kind": "skill_pack",
+			"source": "https://github.com/sangkan-dev/cantrik/tree/main/contrib/skill-registry/demo",
+			"install_hint": "Dari root clone cantrik:\n  cp -r contrib/skill-registry/demo ~/.local/share/cantrik/skill-registry/demo\n  cd <proyek-anda> && cantrik skill install demo"
+		},
+		{
+			"id": "skill-rust-cli-conventions",
+			"name": "Skill: konvensi Rust CLI",
+			"description": "Gaya kode CLI ala Cantrik (Result, clap, modul, fmt/clippy/test).",
+			"kind": "skill_pack",
+			"source": "https://github.com/sangkan-dev/cantrik/tree/main/contrib/skill-registry/rust-cli-conventions",
+			"install_hint": "cp -r contrib/skill-registry/rust-cli-conventions ~/.local/share/cantrik/skill-registry/rust-cli-conventions\n  cd <proyek> && cantrik skill install rust-cli-conventions"
+		},
+		{
+			"id": "skill-code-review-checklist",
+			"name": "Skill: checklist review kode",
+			"description": "Panduan ringkas untuk agen saat review PR/diff (correctness, tes, security, UX).",
+			"kind": "skill_pack",
+			"source": "https://github.com/sangkan-dev/cantrik/tree/main/contrib/skill-registry/code-review-checklist",
+			"install_hint": "cp -r contrib/skill-registry/code-review-checklist ~/.local/share/cantrik/skill-registry/code-review-checklist\n  cd <proyek> && cantrik skill install code-review-checklist"
+		},
+		{
+			"id": "skill-agent-mcp-basics",
+			"name": "Skill: MCP untuk agen coding",
+			"description": "Kapan pakai MCP, providers.toml, cantrik mcp call, dan kesadaran offline/safety.",
+			"kind": "skill_pack",
+			"source": "https://github.com/sangkan-dev/cantrik/tree/main/contrib/skill-registry/agent-mcp-basics",
+			"install_hint": "cp -r contrib/skill-registry/agent-mcp-basics ~/.local/share/cantrik/skill-registry/agent-mcp-basics\n  cd <proyek> && cantrik skill install agent-mcp-basics"
+		},
+		{
+			"id": "skill-rust-testing-hints",
+			"name": "Skill: pola tes Rust",
+			"description": "Unit test, tempfile, async tokio::test, scope cargo test -p.",
+			"kind": "skill_pack",
+			"source": "https://github.com/sangkan-dev/cantrik/tree/main/contrib/skill-registry/rust-testing-hints",
+			"install_hint": "cp -r contrib/skill-registry/rust-testing-hints ~/.local/share/cantrik/skill-registry/rust-testing-hints\n  cd <proyek> && cantrik skill install rust-testing-hints"
+		},
+		{
+			"id": "skill-docs-and-adrs",
+			"name": "Skill: dokumentasi & ADR",
+			"description": "README, ADR, gaya penulisan teknis yang akurat.",
+			"kind": "skill_pack",
+			"source": "https://github.com/sangkan-dev/cantrik/tree/main/contrib/skill-registry/docs-and-adrs",
+			"install_hint": "cp -r contrib/skill-registry/docs-and-adrs ~/.local/share/cantrik/skill-registry/docs-and-adrs\n  cd <proyek> && cantrik skill install docs-and-adrs"
+		},
+		{
+			"id": "skill-pack-authoring",
+			"name": "Skill: menulis paket skill .md",
+			"description": "Cara menyusun manifest.toml dan file skills untuk registry lokal Cantrik.",
+			"kind": "skill_pack",
+			"source": "https://github.com/sangkan-dev/cantrik/tree/main/contrib/skill-registry/skill-pack-authoring",
+			"install_hint": "cp -r contrib/skill-registry/skill-pack-authoring ~/.local/share/cantrik/skill-registry/skill-pack-authoring\n  cd <proyek> && cantrik skill install skill-pack-authoring"
+		},
+		{
+			"id": "lua-plugin-hook",
+			"name": "Plugin Lua (.cantrik/plugins)",
+			"description": "Hook on_task_start / after_write; cocok untuk saran otomatis atau logging. Tidak diunduh otomatis dari hub.",
+			"kind": "lua_plugin",
+			"source": "https://github.com/sangkan-dev/cantrik/blob/main/prd/cantrik-prd.md",
+			"install_hint": "Salin file .lua ke .cantrik/plugins/ — lalu uji dengan cantrik ask (on_task_start) atau write_file (after_write)."
+		},
+		{
+			"id": "wasm-plugin-hook",
+			"name": "Plugin WASM (.cantrik/plugins)",
+			"description": "Hook WASM minimal (mis. after_write_ping); guest tanpa WASI di MVP.",
+			"kind": "wasm_plugin",
+			"source": "https://github.com/sangkan-dev/cantrik/tree/main/contrib/wasm",
+			"install_hint": "Letakkan .wasm di .cantrik/plugins/ — lihat contoh WAT di contrib/wasm/"
+		},
+		{
+			"id": "mcp-stdio-stub",
+			"name": "MCP server (stdio) — pola TOML",
+			"description": "Kerangka [[mcp_client.servers]]; ganti command/args ke server pilihan Anda.",
+			"kind": "mcp_preset",
+			"source": "https://github.com/sangkan-dev/cantrik/blob/main/crates/cantrik-core/src/llm/providers.rs",
+			"install_hint": "Tambahkan ke ~/.config/cantrik/providers.toml:\n\n[[mcp_client.servers]]\nname = \"example\"\ncommand = \"npx\"\nargs = [\"-y\", \"@modelcontextprotocol/server-filesystem\", \"/path/to/allowed\"]\n\nLalu: cantrik mcp call example <tool> --json '{}'"
+		},
+		{
+			"id": "mcp-preset-filesystem",
+			"name": "MCP: filesystem (npm official)",
+			"description": "Akses terbatas ke satu direktori di disk lewat MCP stdio.",
+			"kind": "mcp_preset",
+			"source": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
+			"install_hint": "~/.config/cantrik/providers.toml:\n\n[[mcp_client.servers]]\nname = \"fs\"\ncommand = \"npx\"\nargs = [\"-y\", \"@modelcontextprotocol/server-filesystem\", \"/ABS/PATH/ANDA\"]\n\nUji: cantrik mcp call fs list_directory --json '{\"path\":\".\"}'"
+		},
+		{
+			"id": "mcp-preset-github",
+			"name": "MCP: GitHub API",
+			"description": "Tool GitHub (issue, repo, …) via MCP. Token hanya lewat environment, jangan commit.",
+			"kind": "mcp_preset",
+			"source": "https://github.com/modelcontextprotocol/servers/tree/main/src/github",
+			"install_hint": "Export token dulu: export GITHUB_PERSONAL_ACCESS_TOKEN=...  (atau sesuai dokumentasi paket)\n\n[[mcp_client.servers]]\nname = \"github\"\ncommand = \"npx\"\nargs = [\"-y\", \"@modelcontextprotocol/server-github\"]\n\nUji: cantrik mcp call github search_repositories --json '{\"query\":\"cantrik\"}'"
+		},
+		{
+			"id": "mcp-preset-fetch",
+			"name": "MCP: fetch HTTP",
+			"description": "Ambil konten URL lewat MCP (berguna untuk agen yang butuh halaman web terkontrol).",
+			"kind": "mcp_preset",
+			"source": "https://github.com/modelcontextprotocol/servers/tree/main/src/fetch",
+			"install_hint": "[[mcp_client.servers]]\nname = \"fetch\"\ncommand = \"npx\"\nargs = [\"-y\", \"@modelcontextprotocol/server-fetch\"]\n\nUji dengan tool yang didokumentasikan paket (mis. fetch)."
+		},
+		{
+			"id": "mcp-preset-git",
+			"name": "MCP: git lokal",
+			"description": "Operasi git read-oriented lewat MCP pada repo lokal.",
+			"kind": "mcp_preset",
+			"source": "https://github.com/modelcontextprotocol/servers/tree/main/src/git",
+			"install_hint": "[[mcp_client.servers]]\nname = \"git\"\ncommand = \"npx\"\nargs = [\"-y\", \"@modelcontextprotocol/server-git\", \"--repository\", \"/ABS/PATH/REPO\"]\n\nSesuaikan path repo; cek daftar tool: dokumentasi server-git."
+		},
+		{
+			"id": "mcp-preset-memory",
+			"name": "MCP: memory (knowledge graph)",
+			"description": "Penyimpanan fakta/relasi antar sesi untuk agen yang butuh memori jangka panjang.",
+			"kind": "mcp_preset",
+			"source": "https://github.com/modelcontextprotocol/servers/tree/main/src/memory",
+			"install_hint": "[[mcp_client.servers]]\nname = \"memory\"\ncommand = \"npx\"\nargs = [\"-y\", \"@modelcontextprotocol/server-memory\"]\n\nData biasanya lokal; tinjau privasi sebelum produksi."
+		},
+		{
+			"id": "mcp-preset-brave-search",
+			"name": "MCP: Brave Search",
+			"description": "Pencarian web via Brave Search API (perlu kunci API di environment).",
+			"kind": "mcp_preset",
+			"source": "https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search",
+			"install_hint": "export BRAVE_API_KEY=...   # jangan commit\n\n[[mcp_client.servers]]\nname = \"brave\"\ncommand = \"npx\"\nargs = [\"-y\", \"@modelcontextprotocol/server-brave-search\"]\n\nCantrik juga punya cantrik web search terpisah; pilih sesuai kebijakan proyek."
+		},
+		{
+			"id": "mcp-preset-everything",
+			"name": "MCP: everything (demo/reference)",
+			"description": "Server referensi MCP dengan banyak tool dummy — cocok untuk belajar wiring, bukan produksi.",
+			"kind": "mcp_preset",
+			"source": "https://github.com/modelcontextprotocol/servers/tree/main/src/everything",
+			"install_hint": "[[mcp_client.servers]]\nname = \"everything\"\ncommand = \"npx\"\nargs = [\"-y\", \"@modelcontextprotocol/server-everything\"]\n\nUji: cantrik mcp call everything echo --json '{\"message\":\"hi\"}'"
+		},
+		{
+			"id": "mcp-preset-sequential-thinking",
+			"name": "MCP: sequential thinking",
+			"description": "Alat bantu merapikan rantai pemikiran langkah-demi-langkah (berguna untuk agen perencana).",
+			"kind": "mcp_preset",
+			"source": "https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking",
+			"install_hint": "[[mcp_client.servers]]\nname = \"think\"\ncommand = \"npx\"\nargs = [\"-y\", \"@modelcontextprotocol/server-sequential-thinking\"]\n\nNama paket npm bisa berubah; verifikasi di npm jika perintah gagal."
+		},
+		{
+			"id": "recipe-generic",
+			"name": "Recipe: template generic (init)",
+			"description": "Rujukan ke entri recipes di hub — cocok untuk proyek baru.",
+			"kind": "recipe_ref",
+			"source": "https://github.com/sangkan-dev/cantrik/blob/main/apps/cantrik-site/static/registry/recipes.json",
+			"recipe_id": "generic",
+			"install_hint": "cantrik init                    # atau buka /registry/recipes di hub untuk daftar template"
+		}
+	]
+}

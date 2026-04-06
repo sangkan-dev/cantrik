@@ -85,7 +85,7 @@
 	</p>
 	<ul class="mt-8 list-inside list-disc space-y-3 font-mono text-sm text-ash">
 		<li>
-			<a class="text-gold hover:text-gold-bright" href={resolve('/registry')}>Plugin registry</a>
+			<a class="text-gold hover:text-gold-bright" href={resolve('/registry')}>Extension registry</a>
 		</li>
 		<li>
 			<a class="text-gold hover:text-gold-bright" href={resolve('/registry/recipes')}

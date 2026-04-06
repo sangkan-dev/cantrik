@@ -25,6 +25,7 @@ pub(crate) mod macro_cmd;
 pub(crate) mod mcp_client_cmd;
 pub(crate) mod plan;
 pub(crate) mod pr_cmd;
+pub(crate) mod registry_cmd;
 pub(crate) mod review_cmd;
 pub(crate) mod rgrep_cmd;
 pub(crate) mod rollback_cmd;

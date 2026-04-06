@@ -8,7 +8,7 @@ pub use engine::{FailureRecord, PlanLoopError, PlanOutcome, PlanningLimits, run_
 pub use model::{Plan, PlanStep};
 pub use parse::{
     ExperimentWrites, extract_json_object, parse_eval_response, parse_experiment_writes,
-    parse_plan_document,
+    parse_experiment_writes_greedy, parse_plan_document,
 };
 
 #[cfg(test)]

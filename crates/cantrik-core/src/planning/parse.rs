@@ -127,3 +127,88 @@ pub fn parse_experiment_writes(raw: &str) -> ExperimentWrites {
             .collect(),
     }
 }
+
+/// Byte index of the closing `}` for a JSON object starting at `start`, respecting strings and escapes.
+fn json_object_end(bytes: &[u8], start: usize) -> Option<usize> {
+    if start >= bytes.len() || bytes[start] != b'{' {
+        return None;
+    }
+    let mut depth = 0i32;
+    let mut in_str = false;
+    let mut escape = false;
+    let mut i = start;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_str {
+            if escape {
+                escape = false;
+            } else if b == b'\\' {
+                escape = true;
+            } else if b == b'"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        match b {
+            b'"' => in_str = true,
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Collect `writes` from every top-level JSON object in `raw` that deserializes as experiment output.
+/// Later objects win on duplicate `path`. Falls back to [`parse_experiment_writes`] if none match.
+/// Use this for streamed LLM text that may contain multiple `{"writes":[...]}` blobs.
+pub fn parse_experiment_writes_greedy(raw: &str) -> ExperimentWrites {
+    let bytes = raw.as_bytes();
+    let mut merged: Vec<ExperimentWrite> = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'{'
+            && let Some(end) = json_object_end(bytes, i)
+        {
+            let slice = &raw[i..=end];
+            if let Ok(w) = serde_json::from_str::<ExperimentWire>(slice) {
+                for e in w.writes {
+                    merged.retain(|x| x.path != e.path);
+                    merged.push(ExperimentWrite {
+                        path: e.path,
+                        content: e.content,
+                    });
+                }
+            }
+            i = end + 1;
+            continue;
+        }
+        i += 1;
+    }
+    if merged.is_empty() {
+        parse_experiment_writes(raw)
+    } else {
+        ExperimentWrites { writes: merged }
+    }
+}
+
+#[cfg(test)]
+mod greedy_tests {
+    use super::*;
+
+    #[test]
+    fn greedy_merges_two_objects_last_path_wins() {
+        let raw = r#"{"writes":[{"path":"a.txt","content":"one"}]} xxx {"writes":[{"path":"a.txt","content":"two"},{"path":"b.txt","content":"y"}]}"#;
+        let w = parse_experiment_writes_greedy(raw);
+        assert_eq!(w.writes.len(), 2);
+        let a = w.writes.iter().find(|x| x.path == "a.txt").unwrap();
+        assert_eq!(a.content, "two");
+    }
+}

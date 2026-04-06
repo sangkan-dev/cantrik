@@ -41,16 +41,28 @@ impl ReplCompletion {
     }
 
     /// Replace the fragment after the trigger with the selected item (drops old query).
+    /// `#` palette replaces the whole `#…` fragment with the pick (e.g. `/plan`); `@` keeps `@` + path.
     pub fn apply_to_input(&self, input: &mut String) -> bool {
         if self.filtered.is_empty() {
             return false;
         }
         let pick = &self.filtered[self.selected];
-        if input.len() < self.trigger_pos.saturating_add(1) {
-            return false;
+        match self.kind {
+            CompletionKind::Hash => {
+                if input.len() < self.trigger_pos {
+                    return false;
+                }
+                input.truncate(self.trigger_pos);
+                input.push_str(pick);
+            }
+            CompletionKind::Path => {
+                if input.len() < self.trigger_pos.saturating_add(1) {
+                    return false;
+                }
+                input.truncate(self.trigger_pos.saturating_add(1));
+                input.push_str(pick);
+            }
         }
-        input.truncate(self.trigger_pos.saturating_add(1));
-        input.push_str(pick);
         true
     }
 }
@@ -189,5 +201,15 @@ mod tests {
         let v = vec!["a".into(), "ab".into(), "bc".into()];
         let f = filter_candidates(&v, "a", 10);
         assert_eq!(f, vec!["a", "ab"]);
+    }
+
+    #[test]
+    fn hash_apply_drops_hash_prefix() {
+        let mut c = new_hash_completion(0);
+        c.filtered = vec!["/plan".into()];
+        c.selected = 0;
+        let mut input = "#/pla".to_string();
+        assert!(c.apply_to_input(&mut input));
+        assert_eq!(input, "/plan");
     }
 }

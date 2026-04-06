@@ -12,21 +12,26 @@ use std::sync::{Arc, Mutex};
 use cantrik_core::config::{AppConfig, effective_cultural_wisdom, effective_tui_split_pane};
 use cantrik_core::cultural_wisdom;
 use cantrik_core::llm::{self, LlmError};
+use cantrik_core::planning::parse_experiment_writes_greedy;
 use cantrik_core::session::{
     append_message, build_llm_prompt, connect_pool, expand_at_path_attachments,
     load_anchors_combined, maybe_summarize_session, memory_db_path, message_count,
     open_or_create_session, session_project_fingerprint,
 };
+use cantrik_core::tool_system::tool_write_file;
+use cantrik_core::tools::{WriteApproval, diff_for_new_contents};
 use cantrik_core::usage_ledger::{current_year_month_utc, month_spend_usd, session_spend_usd};
 use cantrik_core::visualize::{self, VisualizeKind};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::DefaultTerminal;
 use ratatui::layout::{Constraint, Layout};
-use ratatui::style::{Color, Style};
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
 use tokio::runtime::Handle;
 
 use crate::commands::agents_cmd;
+use crate::commands::approval_record;
 use crate::commands::doctor;
 use crate::commands::health;
 use crate::commands::plan as plan_cmd;
@@ -34,6 +39,137 @@ use repl_completion::{ReplCompletion, new_hash_completion, new_path_completion, 
 
 const MAX_THINKING_LINES: usize = 48;
 const MAX_INPUT_HISTORY: usize = 100;
+
+/// Terminal palette approximating hub “gold on volcanic / andesite” (truecolor).
+mod repl_palette {
+    use ratatui::style::Color;
+    pub const GOLD: Color = Color::Rgb(214, 176, 94);
+    pub const GOLD_DIM: Color = Color::Rgb(168, 140, 72);
+    pub const TEXT: Color = Color::Rgb(232, 230, 224);
+    pub const MUTED: Color = Color::Rgb(168, 165, 156);
+    pub const BORDER: Color = Color::Rgb(72, 70, 66);
+    pub const ACCENT2: Color = Color::Rgb(130, 168, 198);
+    pub const INPUT_BORDER: Color = Color::Rgb(108, 140, 96);
+    pub const STATUS_WARN: Color = Color::Rgb(220, 180, 90);
+    pub const HIGHLIGHT_BG: Color = Color::Rgb(58, 54, 48);
+    pub const HIGHLIGHT_FG: Color = Color::Rgb(252, 248, 240);
+}
+
+/// Break long lines (unified diff, JSON) to terminal width so text stays readable.
+fn hard_wrap_block(text: &str, width: usize) -> String {
+    let w = width.max(20);
+    let mut out = String::with_capacity(text.len().saturating_add(text.len() / w));
+    for line in text.lines() {
+        let mut s = line;
+        if s.is_empty() {
+            out.push('\n');
+            continue;
+        }
+        while !s.is_empty() {
+            if s.len() <= w {
+                out.push_str(s);
+                out.push('\n');
+                break;
+            }
+            let mut cut = w;
+            while cut > 0 && !s.is_char_boundary(cut) {
+                cut -= 1;
+            }
+            if cut == 0 {
+                cut = 1;
+                while cut < s.len() && !s.is_char_boundary(cut) {
+                    cut += 1;
+                }
+            }
+            out.push_str(&s[..cut]);
+            out.push('\n');
+            s = &s[cut..];
+        }
+    }
+    out
+}
+
+fn thinking_panel_text(thinking: &VecDeque<String>, width: usize) -> String {
+    let w = width.max(20);
+    thinking
+        .iter()
+        .rev()
+        .take(14)
+        .rev()
+        .map(|entry| hard_wrap_block(entry, w))
+        .collect::<Vec<_>>()
+        .join("\n---\n")
+}
+
+/// Shrink huge streams (long JSON) to a suffix that fits ~the panel; then hard-wrap.
+fn assistant_panel_content(output: &str, area: ratatui::layout::Rect) -> String {
+    let w = area.width.saturating_sub(2).max(12) as usize;
+    let h = area.height.saturating_sub(2).max(3) as usize;
+    let target = w.saturating_mul(h).saturating_mul(3).clamp(6_000, 96_000);
+    if output.len() <= target {
+        return hard_wrap_block(output, w);
+    }
+    let mut cut = output.len().saturating_sub(target);
+    while cut < output.len() && !output.is_char_boundary(cut) {
+        cut += 1;
+    }
+    format!(
+        "-- {} KiB earlier output hidden --\n{}",
+        cut / 1024,
+        hard_wrap_block(&output[cut..], w)
+    )
+}
+
+/// Prepended to every REPL LLM request so the model answers as Cantrik with grounded capabilities.
+const REPL_ASSISTANT_DIRECTIVE: &str = r##"[Cantrik REPL — assistant policy]
+You are **Cantrik**, the open-source AI coding agent from the Sangkan ecosystem (https://cantrik.sangkan.dev). If asked who you are, your name, or what product you belong to, identify as Cantrik / Sangkan—not a nameless generic chatbot.
+
+**Capabilities (full CLI; this session is chat-first):** the Cantrik binary includes tools such as `ask`, `file read/write`, `exec`, `git`, `rgrep`, `fetch`, `index` + `search`, `plan`, `agents`, `experiment`, `mcp call`, `session`, `skill`, `macros`, `health`, `review`, `workspace`, `configure`, hooks (Lua/WASM under `.cantrik/plugins/`), project `rules.md` and skills. In REPL you mostly answer in natural language; when the user wants code saved, you may emit JSON with a `writes` array (paths relative to project root) as documented in context.
+
+**Style:** use short paragraphs, blank lines between ideas, and bullets when listing options. Do not paste enormous unreadable JSON without a one-line summary first."##;
+
+fn prepend_repl_directive(body: String) -> String {
+    format!("{REPL_ASSISTANT_DIRECTIVE}\n\n---\n\n{body}")
+}
+
+const MAX_CHAT_TURNS: usize = 100;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChatRole {
+    User,
+    Assistant,
+}
+
+#[derive(Debug, Clone)]
+struct ChatTurn {
+    role: ChatRole,
+    text: String,
+}
+
+/// Hide raw `{"writes":...}` lines in the chat panel (full text stays in DB and for Y/N parse).
+fn soften_assistant_for_chat(s: &str) -> String {
+    let placeholder =
+        "  [usulan ubah file dari model — panel **log** menampilkan diff & konfirmasi Y/N]";
+    let mut out: Vec<String> = Vec::new();
+    let mut prev_placeholder = false;
+    for line in s.lines() {
+        let t = line.trim_start();
+        let hide = !t.is_empty()
+            && t.starts_with('{')
+            && t.contains("\"writes\"")
+            && (t.len() > 48 || t.contains("\"path\""));
+        if hide {
+            if !prev_placeholder {
+                out.push(placeholder.to_string());
+                prev_placeholder = true;
+            }
+            continue;
+        }
+        prev_placeholder = false;
+        out.push(line.to_string());
+    }
+    out.join("\n")
+}
 
 #[derive(Debug, Clone)]
 enum SlashCmd {
@@ -69,16 +205,22 @@ struct ReplState {
     input_history: Vec<String>,
     hist_cursor: Option<usize>,
     thinking: VecDeque<String>,
-    /// Full transcript of assistant replies (for tail display).
-    output: String,
+    /// Chat turns (user vs Cantrik) for the main panel.
+    chat: Vec<ChatTurn>,
+    /// Assistant reply being streamed (merged into `chat` on Done).
+    stream_buf: String,
     /// Last `/visualize` output (shown in split-pane preview).
     preview: String,
     busy: bool,
     mem: Option<ReplMemory>,
     /// `@` / `#` completion (see `repl_completion`).
     completion: Option<ReplCompletion>,
+    /// Ratatui list scroll state for completion popup.
+    completion_list_state: ListState,
     /// Cached paths for `@` completion (per REPL session).
     path_completion_cache: Vec<String>,
+    /// Model JSON `writes` waiting for Y/N (see `parse_experiment_writes_greedy`).
+    pending_writes: Option<cantrik_core::planning::ExperimentWrites>,
 }
 
 impl ReplState {
@@ -88,12 +230,15 @@ impl ReplState {
             input_history: Vec::new(),
             hist_cursor: None,
             thinking: VecDeque::new(),
-            output: String::new(),
+            chat: Vec::new(),
+            stream_buf: String::new(),
             preview: String::new(),
             busy: false,
             mem,
             completion: None,
+            completion_list_state: ListState::default(),
             path_completion_cache: Vec::new(),
+            pending_writes: None,
         }
     }
 
@@ -103,6 +248,34 @@ impl ReplState {
             self.thinking.pop_front();
         }
     }
+
+    fn push_chat_turn(&mut self, turn: ChatTurn) {
+        self.chat.push(turn);
+        while self.chat.len() > MAX_CHAT_TURNS {
+            self.chat.remove(0);
+        }
+    }
+}
+
+fn chat_transcript_for_ui(state: &ReplState, area: ratatui::layout::Rect) -> String {
+    let w = area.width.saturating_sub(2).max(12) as usize;
+    let mut blocks: Vec<String> = Vec::new();
+    for turn in &state.chat {
+        let (label, body) = match turn.role {
+            ChatRole::User => ("── kamu ──", hard_wrap_block(&turn.text, w.max(20))),
+            ChatRole::Assistant => (
+                "── cantrik ──",
+                hard_wrap_block(&soften_assistant_for_chat(&turn.text), w.max(20)),
+            ),
+        };
+        blocks.push(format!("{label}\n{body}"));
+    }
+    if !state.stream_buf.is_empty() {
+        let b = hard_wrap_block(&soften_assistant_for_chat(&state.stream_buf), w.max(20));
+        blocks.push(format!("── cantrik · streaming… ──\n{b}"));
+    }
+    let joined = blocks.join("\n\n");
+    assistant_panel_content(&joined, area)
 }
 
 /// Run interactive REPL; blocks current thread — call from `spawn_blocking` with Tokio handle.
@@ -131,7 +304,7 @@ fn run_loop(
     let (tx_llm, rx_llm) = std::sync::mpsc::channel::<LlmUiMsg>();
 
     state.push_thinking(
-        "Cantrik REPL — /help for slash commands; @ file path; # command palette; Ctrl+C to quit."
+        "Cantrik REPL — panel utama = chat (kamu / Cantrik); atas = log; /help; @ #; JSON writes → Y/N di log; Ctrl+C quit."
             .to_string(),
     );
     if state.mem.is_some() {
@@ -143,16 +316,20 @@ fn run_loop(
     }
 
     loop {
-        terminal.draw(|frame| ui(frame, &state, &config))?;
+        terminal.draw(|frame| ui(frame, &mut state, &config))?;
 
         while let Ok(msg) = rx_llm.try_recv() {
             match msg {
                 LlmUiMsg::Chunk(s) => {
-                    state.output.push_str(&s);
+                    state.stream_buf.push_str(&s);
                 }
                 LlmUiMsg::Done(Ok(()), assistant_text) => {
                     state.busy = false;
-                    state.output.push('\n');
+                    state.stream_buf.clear();
+                    state.push_chat_turn(ChatTurn {
+                        role: ChatRole::Assistant,
+                        text: assistant_text.clone(),
+                    });
                     state.push_thinking("assistant: stream finished OK.".to_string());
                     if let Some(ref m) = state.mem
                         && let Err(e) = rt.block_on(append_message(
@@ -164,9 +341,11 @@ fn run_loop(
                     {
                         state.push_thinking(format!("session save: {e}"));
                     }
+                    offer_repl_writes_from_model(&cwd, &mut state, &assistant_text);
                 }
                 LlmUiMsg::Done(Err(e), _) => {
                     state.busy = false;
+                    state.stream_buf.clear();
                     state.push_thinking(format!("assistant error: {e}"));
                 }
             }
@@ -186,6 +365,34 @@ fn run_loop(
                     }
 
                     match key.code {
+                        KeyCode::Char(c)
+                            if state.pending_writes.is_some()
+                                && state.completion.is_none()
+                                && (c == 'y' || c == 'Y' || c == 'n' || c == 'N') =>
+                        {
+                            state.hist_cursor = None;
+                            match c {
+                                'y' | 'Y' => {
+                                    if let Some(w) = state.pending_writes.take() {
+                                        apply_repl_writes(
+                                            &mut state,
+                                            cwd.as_path(),
+                                            &config,
+                                            &rt,
+                                            w,
+                                        );
+                                    }
+                                }
+                                'n' | 'N' => {
+                                    state.pending_writes = None;
+                                    state.push_thinking(
+                                        "skipped applying model file writes.".to_string(),
+                                    );
+                                }
+                                _ => {}
+                            }
+                            continue;
+                        }
                         KeyCode::Char(c) => {
                             state.hist_cursor = None;
                             if state.completion.is_none() && c == '@' {
@@ -326,6 +533,65 @@ fn run_loop(
     }
 }
 
+fn offer_repl_writes_from_model(cwd: &Path, state: &mut ReplState, assistant_text: &str) {
+    let parsed = parse_experiment_writes_greedy(assistant_text);
+    if parsed.writes.is_empty() {
+        return;
+    }
+    state.push_thinking(format!(
+        "—— {} proposed file(s) from model JSON (diff preview, truncated) ——",
+        parsed.writes.len()
+    ));
+    for w in &parsed.writes {
+        let full = cwd.join(&w.path);
+        match diff_for_new_contents(&full, &w.content) {
+            Ok(d) => {
+                const CAP: usize = 2400;
+                let body = if d.len() > CAP {
+                    format!("{}\n… ({} bytes total)", &d[..CAP], d.len())
+                } else {
+                    d
+                };
+                state.push_thinking(format!("--- {} ---\n{}", w.path, body));
+            }
+            Err(e) => state.push_thinking(format!("diff {}: {e}", w.path)),
+        }
+    }
+    state.push_thinking("Apply to disk? Press Y (or type yes + Enter), or N / no to skip.");
+    state.pending_writes = Some(parsed);
+}
+
+fn apply_repl_writes(
+    state: &mut ReplState,
+    cwd: &Path,
+    config: &AppConfig,
+    rt: &Handle,
+    writes: cantrik_core::planning::ExperimentWrites,
+) {
+    for w in writes.writes {
+        let rel = Path::new(&w.path);
+        match tool_write_file(
+            config,
+            cwd,
+            rel,
+            &w.content,
+            WriteApproval::user_confirmed_after_reviewing_diff(),
+        ) {
+            Ok(()) => {
+                state.push_thinking(format!("wrote {}", w.path));
+                rt.block_on(approval_record::record_if_adaptive(
+                    cwd,
+                    config,
+                    "write_file",
+                    true,
+                    &w.path,
+                ));
+            }
+            Err(e) => state.push_thinking(format!("write {} failed: {e}", w.path)),
+        }
+    }
+}
+
 fn handle_line(
     line: &str,
     cwd: &Path,
@@ -336,6 +602,26 @@ fn handle_line(
 ) -> IoResult<bool> {
     let trimmed = line.trim();
     let lower = trimmed.to_ascii_lowercase();
+
+    if state.pending_writes.is_some() {
+        if matches!(lower.as_str(), "y" | "yes") {
+            let w = state.pending_writes.take().unwrap();
+            apply_repl_writes(state, cwd, config, rt, w);
+            return Ok(false);
+        }
+        if matches!(lower.as_str(), "n" | "no") {
+            state.pending_writes = None;
+            state.push_thinking("skipped applying model file writes.");
+            return Ok(false);
+        }
+        if !trimmed.starts_with('/') && !trimmed.is_empty() {
+            state.push_thinking(
+                "File write proposal pending: Y/yes or N/no first, or use a /command.",
+            );
+            return Ok(false);
+        }
+    }
+
     if matches!(lower.as_str(), "exit" | "quit") {
         return Ok(true);
     }
@@ -345,7 +631,7 @@ fn handle_line(
             SlashCmd::Exit => return Ok(true),
             SlashCmd::Help => {
                 state.push_thinking(
-                    "/cost · /memory · /plan · /agents · /visualize [callgraph|architecture|dependencies] · /doctor · /health · /exit — also @ paths and # palette in the input line",
+                    "/cost · /memory · /plan · /agents · /visualize · /doctor · /health · /exit — chat panel + @ path + # slash palette",
                 );
             }
             SlashCmd::Visualize(tail) => {
@@ -353,9 +639,10 @@ fn handle_line(
                 match visualize::render_visualize_kind(kind, cwd) {
                     Ok(text) => {
                         state.preview = text.clone();
-                        state.output.push_str("\n--- visualize ---\n");
-                        state.output.push_str(&text);
-                        state.output.push('\n');
+                        state.push_chat_turn(ChatTurn {
+                            role: ChatRole::Assistant,
+                            text: format!("(/visualize · {kind:?})\n\n{text}"),
+                        });
                         state.push_thinking(format!(
                             "visualize: {kind:?} (enable [ui] tui_split_pane for side preview)."
                         ));
@@ -532,7 +819,7 @@ fn handle_line(
         .mem
         .as_ref()
         .map(|m| (m.pool.clone(), m.session_id.clone()));
-    let full_prompt = if let Some((ref pool, ref session_id)) = mem {
+    let full_prompt = prepend_repl_directive(if let Some((ref pool, ref session_id)) = mem {
         if let Err(e) = rt.block_on(maybe_summarize_session(pool, session_id, cwd, config)) {
             state.push_thinking(format!("summarize warn: {e}"));
         }
@@ -541,6 +828,10 @@ fn handle_line(
             state.busy = false;
             return Ok(false);
         }
+        state.push_chat_turn(ChatTurn {
+            role: ChatRole::User,
+            text: prompt.clone(),
+        });
         let attach = expand_at_path_attachments(cwd, &prompt, config);
         match rt.block_on(build_llm_prompt(
             pool,
@@ -560,6 +851,10 @@ fn handle_line(
     } else {
         let attach = expand_at_path_attachments(cwd, &prompt, config);
         let p = prompt.clone();
+        state.push_chat_turn(ChatTurn {
+            role: ChatRole::User,
+            text: prompt.clone(),
+        });
         match (
             cultural_wisdom::prompt_addon(effective_cultural_wisdom(&config.ui)),
             attach,
@@ -569,7 +864,7 @@ fn handle_line(
             (None, Some(a)) => format!("{a}\n\nuser: {p}\n"),
             (None, None) => p,
         }
-    };
+    });
 
     let cfg = config.clone();
     let tx_chunk = tx_llm.clone();
@@ -664,125 +959,186 @@ fn parse_slash(line: &str) -> Option<SlashCmd> {
     })
 }
 
-fn ui(frame: &mut ratatui::Frame, state: &ReplState, config: &AppConfig) {
+fn ui(frame: &mut ratatui::Frame, state: &mut ReplState, config: &AppConfig) {
+    use repl_palette::*;
+
+    let area = frame.area();
+    let total_h = area.height.max(12);
+    let think_h = (total_h / 4).clamp(10, 18);
     let input_h = if state.completion.is_some() {
-        12_u16
+        (total_h * 34 / 100).clamp(14, 26)
     } else {
         3
     };
     let vertical = Layout::vertical([
-        Constraint::Length(10),
-        Constraint::Min(4),
+        Constraint::Length(think_h),
+        Constraint::Min(6),
         Constraint::Length(input_h),
     ]);
-    let [thinking_area, main_area, input_area] = vertical.areas(frame.area());
+    let [thinking_area, main_area, input_area] = vertical.areas(area);
 
-    let thinking_items: Vec<ListItem> = state
-        .thinking
-        .iter()
-        .rev()
-        .take(9)
-        .rev()
-        .map(|l| {
-            ListItem::new(
-                ratatui::text::Line::from(l.as_str()).style(Style::default().fg(Color::DarkGray)),
-            )
-        })
-        .collect();
+    let think_w = thinking_area.width.saturating_sub(2) as usize;
+    let think_body = thinking_panel_text(&state.thinking, think_w);
     let think_block = Block::default()
         .borders(Borders::ALL)
-        .title(" thinking / log ")
-        .border_style(Style::default().fg(Color::Yellow));
-    let think = List::new(thinking_items).block(think_block);
-    frame.render_widget(think, thinking_area);
+        .title(Line::from(vec![
+            Span::styled(
+                " log ",
+                Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("session · proposals · diff", Style::default().fg(MUTED)),
+        ]))
+        .border_style(Style::default().fg(BORDER));
+    let think_para = Paragraph::new(think_body)
+        .style(Style::default().fg(TEXT))
+        .wrap(Wrap { trim: true })
+        .block(think_block);
+    frame.render_widget(think_para, thinking_area);
 
     if effective_tui_split_pane(&config.ui) {
-        let h = Layout::horizontal([Constraint::Percentage(58), Constraint::Percentage(42)]);
+        let h = Layout::horizontal([Constraint::Percentage(62), Constraint::Percentage(38)]);
         let [assistant_area, preview_area] = h.areas(main_area);
-        let vis_a = assistant_area.height.saturating_sub(2) as usize;
-        let main_text = tail_lines(&state.output, vis_a.max(1));
+        let main_text = chat_transcript_for_ui(state, assistant_area);
         let main_block = Block::default()
             .borders(Borders::ALL)
-            .title(" assistant (streaming) ")
-            .border_style(Style::default().fg(Color::Cyan));
-        let main_para = Paragraph::new(main_text).block(main_block);
+            .title(Line::from(vec![
+                Span::styled(
+                    " chat ",
+                    Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("kamu · Cantrik", Style::default().fg(MUTED)),
+            ]))
+            .border_style(Style::default().fg(BORDER));
+        let main_para = Paragraph::new(main_text)
+            .style(Style::default().fg(TEXT))
+            .wrap(Wrap { trim: true })
+            .block(main_block);
         frame.render_widget(main_para, assistant_area);
-        let vis_p = preview_area.height.saturating_sub(2) as usize;
-        let prev_text = tail_lines(&state.preview, vis_p.max(1));
+
+        let prev_text = assistant_panel_content(&state.preview, preview_area);
         let prev_block = Block::default()
             .borders(Borders::ALL)
-            .title(" preview / visualize ")
-            .border_style(Style::default().fg(Color::Magenta));
-        let prev_para = Paragraph::new(prev_text).block(prev_block);
+            .title(Line::from(vec![
+                Span::styled(" preview ", Style::default().fg(ACCENT2)),
+                Span::styled("/visualize", Style::default().fg(MUTED)),
+            ]))
+            .border_style(Style::default().fg(BORDER));
+        let prev_para = Paragraph::new(prev_text)
+            .style(Style::default().fg(TEXT))
+            .wrap(Wrap { trim: true })
+            .block(prev_block);
         frame.render_widget(prev_para, preview_area);
     } else {
-        let visible = main_area.height.saturating_sub(2) as usize;
-        let main_text = tail_lines(&state.output, visible.max(1));
+        let main_text = chat_transcript_for_ui(state, main_area);
         let main_block = Block::default()
             .borders(Borders::ALL)
-            .title(" assistant (streaming) ")
-            .border_style(Style::default().fg(Color::Cyan));
-        let main_para = Paragraph::new(main_text).block(main_block);
+            .title(Line::from(vec![
+                Span::styled(
+                    " chat ",
+                    Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("kamu · Cantrik", Style::default().fg(MUTED)),
+            ]))
+            .border_style(Style::default().fg(BORDER));
+        let main_para = Paragraph::new(main_text)
+            .style(Style::default().fg(TEXT))
+            .wrap(Wrap { trim: true })
+            .block(main_block);
         frame.render_widget(main_para, main_area);
     }
 
-    let busy = if state.busy { " [busy]" } else { "" };
-    let title = if state.completion.is_some() {
-        format!(" cantrik>{busy}  @ path  # palette  Tab/↑↓  Enter apply  Esc cancel ")
+    let (busy_label, status_style) = if state.busy {
+        ("busy", Style::default().fg(ACCENT2))
+    } else if state.pending_writes.is_some() {
+        (
+            "Y/N writes",
+            Style::default()
+                .fg(STATUS_WARN)
+                .add_modifier(Modifier::BOLD),
+        )
     } else {
-        format!(" cantrik>{busy} ")
+        ("ready", Style::default().fg(GOLD_DIM))
+    };
+
+    let input_title_line = if state.completion.is_some() {
+        Line::from(vec![
+            Span::styled(
+                "cantrik ",
+                Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(format!("{busy_label} "), status_style),
+            Span::styled("| @ path  # ", Style::default().fg(MUTED)),
+            Span::styled("palette ", Style::default().fg(GOLD_DIM)),
+            Span::styled("| Tab ", Style::default().fg(MUTED)),
+            Span::styled("· ", Style::default().fg(BORDER)),
+            Span::styled("Up/Down ", Style::default().fg(MUTED)),
+            Span::styled("· ", Style::default().fg(BORDER)),
+            Span::styled("Enter ", Style::default().fg(MUTED)),
+            Span::styled("· ", Style::default().fg(BORDER)),
+            Span::styled("Esc ", Style::default().fg(MUTED)),
+        ])
+    } else {
+        Line::from(vec![
+            Span::styled(
+                "cantrik ",
+                Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(format!("{busy_label} "), status_style),
+            Span::styled(" line ", Style::default().fg(MUTED)),
+        ])
     };
 
     if let Some(ref comp) = state.completion {
-        let inner = Layout::vertical([Constraint::Length(3), Constraint::Min(1)]);
+        let inner = Layout::vertical([Constraint::Length(4), Constraint::Min(1)]);
         let [inp_rect, list_rect] = inner.areas(input_area);
         let input_block = Block::default()
             .borders(Borders::ALL)
-            .title(title.clone())
-            .border_style(Style::default().fg(Color::Green));
-        let input_para = Paragraph::new(state.input.as_str()).block(input_block);
+            .title(input_title_line.clone())
+            .border_style(Style::default().fg(INPUT_BORDER));
+        let input_para = Paragraph::new(state.input.as_str())
+            .style(Style::default().fg(TEXT))
+            .wrap(Wrap { trim: true })
+            .block(input_block);
         frame.render_widget(input_para, inp_rect);
 
         let items: Vec<ListItem> = comp
             .filtered
             .iter()
-            .enumerate()
-            .map(|(i, s): (usize, &String)| {
-                let style = if i == comp.selected {
-                    Style::default().fg(Color::Black).bg(Color::Cyan)
-                } else {
-                    Style::default().fg(Color::DarkGray)
-                };
+            .map(|s: &String| {
                 let line = if s.len() > 256 {
                     format!("{}…", &s[..256])
                 } else {
                     s.clone()
                 };
-                ListItem::new(ratatui::text::Line::from(line).style(style))
+                ListItem::new(Line::from(line).style(Style::default().fg(TEXT)))
             })
             .collect();
         let list_block = Block::default()
             .borders(Borders::ALL)
-            .title(" complete ")
-            .border_style(Style::default().fg(Color::DarkGray));
-        let list = List::new(items).block(list_block);
-        frame.render_widget(list, list_rect);
+            .title(Line::from(vec![
+                Span::styled(" pick ", Style::default().fg(GOLD_DIM)),
+                Span::styled("completion", Style::default().fg(MUTED)),
+            ]))
+            .border_style(Style::default().fg(BORDER));
+        let list = List::new(items).block(list_block).highlight_style(
+            Style::default()
+                .fg(HIGHLIGHT_FG)
+                .bg(HIGHLIGHT_BG)
+                .add_modifier(Modifier::BOLD),
+        );
+        state.completion_list_state.select(Some(comp.selected));
+        frame.render_stateful_widget(list, list_rect, &mut state.completion_list_state);
     } else {
         let input_block = Block::default()
             .borders(Borders::ALL)
-            .title(title)
-            .border_style(Style::default().fg(Color::Green));
-        let input_para = Paragraph::new(state.input.as_str()).block(input_block);
+            .title(input_title_line)
+            .border_style(Style::default().fg(INPUT_BORDER));
+        let input_para = Paragraph::new(state.input.as_str())
+            .style(Style::default().fg(TEXT))
+            .wrap(Wrap { trim: true })
+            .block(input_block);
         frame.render_widget(input_para, input_area);
     }
-}
-
-fn tail_lines(s: &str, max_lines: usize) -> String {
-    let lines: Vec<&str> = s.lines().collect();
-    if lines.len() <= max_lines {
-        return s.to_string();
-    }
-    lines[lines.len() - max_lines..].join("\n")
 }
 
 #[cfg(test)]

@@ -4,8 +4,10 @@ use std::path::Path;
 
 use ignore::WalkBuilder;
 
-/// Cap how many paths we collect (large repos).
-pub const MAX_PATH_SCAN: usize = 4000;
+/// Cap how many paths we keep after sorting (large repos).
+/// Shallow paths are sorted first so `@` completion still surfaces dirs like `examples/` before
+/// deep `crates/...` entries exhaust the budget.
+pub const MAX_PATH_SCAN: usize = 12_000;
 /// Visible rows in the completion popup.
 pub const MAX_VISIBLE: usize = 36;
 
@@ -91,12 +93,21 @@ fn filter_candidates(items: &[String], query: &str, max: usize) -> Vec<String> {
     out
 }
 
+fn path_depth(rel: &str) -> usize {
+    rel.bytes().filter(|b| *b == b'/').count()
+}
+
 /// Walk `root` respecting .gitignore; relative POSIX paths.
+///
+/// Collects all matching paths, then sorts **shallow first** (then lexicographically) and truncates
+/// to `max`. Truncating during walk order used to drop entire subtrees (e.g. `examples/`) in
+/// medium-sized repos.
 pub fn collect_repo_paths(root: &Path, max: usize) -> Vec<String> {
     let mut out = Vec::new();
     let mut wb = WalkBuilder::new(root);
     wb.standard_filters(true);
     wb.hidden(false);
+    wb.max_depth(Some(64));
     for ent in wb.build().flatten() {
         let path = ent.path();
         if path == root {
@@ -110,12 +121,10 @@ pub fn collect_repo_paths(root: &Path, max: usize) -> Vec<String> {
             continue;
         }
         out.push(s);
-        if out.len() >= max {
-            break;
-        }
     }
-    out.sort();
+    out.sort_by(|a, b| path_depth(a).cmp(&path_depth(b)).then_with(|| a.cmp(b)));
     out.dedup();
+    out.truncate(max);
     out
 }
 
@@ -211,5 +220,21 @@ mod tests {
         let mut input = "#/pla".to_string();
         assert!(c.apply_to_input(&mut input));
         assert_eq!(input, "/plan");
+    }
+
+    #[test]
+    fn collect_repo_paths_prefers_shallow_under_truncation() {
+        let tmp = std::env::temp_dir().join(format!("cantrik-pathscan-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join("deep/a/b/c/d")).unwrap();
+        std::fs::write(tmp.join("deep/a/b/c/d/z.txt"), "").unwrap();
+        std::fs::create_dir_all(tmp.join("examples")).unwrap();
+        std::fs::write(tmp.join("examples/x.py"), "").unwrap();
+        let paths = collect_repo_paths(&tmp, 50);
+        assert!(
+            paths.iter().any(|p| p == "examples/x.py"),
+            "expected shallow examples path: {paths:?}"
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

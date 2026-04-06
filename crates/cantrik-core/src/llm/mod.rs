@@ -125,6 +125,39 @@ fn http_client() -> Result<Client, LlmError> {
         .map_err(|e| LlmError::Http(e.to_string()))
 }
 
+/// One-line REPL summary: char counts → ~tokens (÷4) and [`cost::approx_cost_usd`] for the **first**
+/// chain target after the same auto-routing heuristic as streaming (bilangan token API bisa beda).
+pub fn format_repl_turn_estimate(
+    app: &AppConfig,
+    routing_prompt: Option<&str>,
+    full_prompt_chars: usize,
+    assistant_chars: usize,
+) -> String {
+    let path = providers_toml_path();
+    let Ok(prov) = load_providers_toml(&path) else {
+        return "usage: (providers.toml tidak terbaca — ~/.config/cantrik/)".to_string();
+    };
+    let mut chain =
+        match build_attempt_chain(app.llm.provider.as_deref(), app.llm.model.as_deref(), &prov) {
+            Ok(c) => c,
+            Err(e) => return format!("usage: ({e})"),
+        };
+    if let Some(rp) = routing_prompt {
+        let _ = apply_auto_route(&mut chain, &prov, rp);
+    }
+    let Some(t) = chain.first() else {
+        return "usage: (tidak ada target LLM)".to_string();
+    };
+    let cost = cost::approx_cost_usd(t.kind, &t.model, full_prompt_chars, assistant_chars);
+    let tin = (full_prompt_chars as f64 / 4.0).max(1.0);
+    let tout = (assistant_chars as f64 / 4.0).max(1.0);
+    format!(
+        "usage ~≈{tin:.0} + {tout:.0} tok ({full_prompt_chars} + {assistant_chars} ch), ~${cost:.4} · {} / {} [estimasi]",
+        t.kind.as_str(),
+        t.model
+    )
+}
+
 /// Stream assistant text chunks to `on_chunk`. Tries primary `[llm]` target then `fallback_chain`.
 pub async fn ask_stream_chunks(
     app: &AppConfig,

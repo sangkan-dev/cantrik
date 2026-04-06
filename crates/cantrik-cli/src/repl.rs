@@ -20,15 +20,15 @@ use cantrik_core::session::{
     load_anchors_combined, maybe_summarize_session, memory_db_path, message_count,
     open_or_create_session, session_project_fingerprint,
 };
-use cantrik_core::tool_system::tool_write_file;
-use cantrik_core::tools::{WriteApproval, diff_for_new_contents};
+use cantrik_core::tool_system::{tool_read_file, tool_write_file};
+use cantrik_core::tools::{WriteApproval, diff_for_new_contents, line_insert_delete_counts};
 use cantrik_core::usage_ledger::{current_year_month_utc, month_spend_usd, session_spend_usd};
 use cantrik_core::visualize::{self, VisualizeKind};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::DefaultTerminal;
 use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Modifier, Style};
-use ratatui::text::{Line, Span};
+use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
 use tokio::runtime::Handle;
 
@@ -66,6 +66,10 @@ mod repl_palette {
     pub const MUTED: Color = Color::Rgb(168, 165, 156);
     pub const BORDER: Color = Color::Rgb(72, 70, 66);
     pub const ACCENT2: Color = Color::Rgb(130, 168, 198);
+    /// Unified diff colours (log panel).
+    pub const DIFF_ADD: Color = Color::Rgb(130, 205, 145);
+    pub const DIFF_DEL: Color = Color::Rgb(230, 120, 115);
+    pub const DIFF_HUNK: Color = Color::Rgb(130, 168, 198);
     pub const INPUT_BORDER: Color = Color::Rgb(108, 140, 96);
     pub const STATUS_WARN: Color = Color::Rgb(220, 180, 90);
     pub const HIGHLIGHT_BG: Color = Color::Rgb(58, 54, 48);
@@ -106,24 +110,102 @@ fn hard_wrap_block(text: &str, width: usize) -> String {
     out
 }
 
-fn thinking_panel_text(
-    thinking: &VecDeque<String>,
+/// One log entry: plain text or a unified diff (styled line-by-line in the TUI).
+#[derive(Debug, Clone)]
+enum LogChunk {
+    Plain(String),
+    Diff(String),
+}
+
+fn diff_line_style(line: &str) -> Style {
+    use repl_palette::{DIFF_ADD, DIFF_DEL, DIFF_HUNK, MUTED, TEXT};
+    let fg = if line.starts_with("+++ ") || line.starts_with("--- ") || line.starts_with("diff ") {
+        MUTED
+    } else if line.starts_with("@@") {
+        DIFF_HUNK
+    } else if line.starts_with('+') {
+        DIFF_ADD
+    } else if line.starts_with('-') {
+        DIFF_DEL
+    } else {
+        TEXT
+    };
+    Style::default().fg(fg)
+}
+
+fn wrap_styled_physical_line(line: &str, w: usize, style: Style) -> Vec<Line<'static>> {
+    let w = w.max(20);
+    let mut out = Vec::new();
+    let mut s = line;
+    while !s.is_empty() {
+        if s.len() <= w {
+            out.push(Line::from(vec![Span::styled(s.to_string(), style)]));
+            break;
+        }
+        let mut cut = w;
+        while cut > 0 && !s.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        if cut == 0 {
+            cut = 1;
+            while cut < s.len() && !s.is_char_boundary(cut) {
+                cut += 1;
+            }
+        }
+        out.push(Line::from(vec![Span::styled(s[..cut].to_string(), style)]));
+        s = &s[cut..];
+    }
+    out
+}
+
+fn diff_chunk_to_lines(diff: &str, w: usize) -> Vec<Line<'static>> {
+    let mut out = Vec::new();
+    for line in diff.lines() {
+        let style = diff_line_style(line);
+        out.extend(wrap_styled_physical_line(line, w, style));
+    }
+    out
+}
+
+fn plain_chunk_to_lines(s: &str, w: usize) -> Vec<Line<'static>> {
+    use repl_palette::TEXT;
+    let style = Style::default().fg(TEXT);
+    let mut out = Vec::new();
+    for line in hard_wrap_block(s, w).lines() {
+        out.push(Line::from(vec![Span::styled(line.to_string(), style)]));
+    }
+    out
+}
+
+fn thinking_panel_collect(
+    thinking: &VecDeque<LogChunk>,
     width: usize,
     scroll_older_entries: usize,
-) -> String {
+) -> Text<'static> {
+    use repl_palette::BORDER;
     let w = width.max(20);
     let len = thinking.len();
     let max_scroll = len.saturating_sub(1);
     let scroll = scroll_older_entries.min(max_scroll);
     let end = len.saturating_sub(scroll);
     let start = end.saturating_sub(THINKING_PANEL_ENTRY_WINDOW);
-    thinking
+    let sep_style = Style::default().fg(BORDER);
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    for (idx, chunk) in thinking
         .iter()
         .skip(start)
         .take(end.saturating_sub(start))
-        .map(|entry| hard_wrap_block(entry, w))
-        .collect::<Vec<_>>()
-        .join("\n---\n")
+        .enumerate()
+    {
+        if idx > 0 {
+            lines.push(Line::from(vec![Span::styled("— — —", sep_style)]));
+        }
+        match chunk {
+            LogChunk::Plain(s) => lines.extend(plain_chunk_to_lines(s, w)),
+            LogChunk::Diff(s) => lines.extend(diff_chunk_to_lines(s, w)),
+        }
+    }
+    Text::from(lines)
 }
 
 /// Shrink huge streams (long JSON) to a suffix that fits ~the panel; then hard-wrap.
@@ -192,7 +274,7 @@ fn soften_assistant_for_chat(s: &str) -> String {
     }
     let placeholder_ok =
         "  [usulan ubah file — buka panel log untuk pratinjau diff & ketik Y / yes atau N / no]";
-    let placeholder_bad = "  [JSON writes gagal diparsing — tidak ada file diusulkan. Buka panel log untuk pesan error; minta ulang dengan blok ```json yang valid.]";
+    let placeholder_bad = "  [JSON writes gagal diparsing — buka panel log: alasan error + potongan teks mentah. Y/N tidak ada sampai JSON valid; jangan ketik yes membabi-buta.]";
     let parsed_ok = !parse_experiment_writes_greedy(s).writes.is_empty();
     let placeholder = if parsed_ok {
         placeholder_ok
@@ -216,6 +298,37 @@ fn soften_assistant_for_chat(s: &str) -> String {
     out.join("\n")
 }
 
+fn truncate_utf8_prefix(s: &str, max_bytes: usize) -> &str {
+    if s.len() <= max_bytes {
+        return s;
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
+}
+
+/// When model `writes` JSON does not parse, show a copyable excerpt in the log (no diff / no Y/N).
+fn push_thinking_failed_writes_excerpt(state: &mut ReplState, assistant_text: &str) {
+    const MAX_EXCERPT_BYTES: usize = 16_384;
+    state.thinking_scroll_older = 0;
+    state.push_thinking(
+        "Tidak ada pratinjau diff atau Y/N sampai JSON valid — perbaiki/teks di bawah, atau `cantrik file write …`."
+            .to_string(),
+    );
+    let excerpt = truncate_utf8_prefix(assistant_text, MAX_EXCERPT_BYTES);
+    let omitted = assistant_text.len().saturating_sub(excerpt.len());
+    let tail = if omitted > 0 {
+        format!(
+            "\n… ({omitted} byte lagi tidak ditampilkan — lihat panel chat untuk balasan lengkap)"
+        )
+    } else {
+        String::new()
+    };
+    state.push_thinking(format!("--- balasan model (mentah) ---\n{excerpt}{tail}"));
+}
+
 #[derive(Debug, Clone)]
 enum SlashCmd {
     Cost,
@@ -227,6 +340,8 @@ enum SlashCmd {
     Agents(Option<String>),
     /// Optional tail: callgraph | architecture | dependencies
     Visualize(Option<String>),
+    /// Read a file into the preview pane (`/peek`, `/view`, `/cat`).
+    Peek(Option<String>),
     Help,
     Exit,
     Unknown(String),
@@ -235,7 +350,7 @@ enum SlashCmd {
 #[derive(Debug)]
 enum LlmUiMsg {
     Chunk(String),
-    Done(Result<(), String>, String),
+    Done(Result<(), String>, String, String),
 }
 
 #[derive(Clone)]
@@ -249,7 +364,7 @@ struct ReplState {
     /// Newest at end; Up arrow walks `hist_cursor`.
     input_history: Vec<String>,
     hist_cursor: Option<usize>,
-    thinking: VecDeque<String>,
+    thinking: VecDeque<LogChunk>,
     /// Chat turns (user vs Cantrik) for the main panel.
     chat: Vec<ChatTurn>,
     /// Assistant reply being streamed (merged into `chat` on Done).
@@ -291,7 +406,16 @@ impl ReplState {
     }
 
     fn push_thinking(&mut self, line: impl Into<String>) {
-        self.thinking.push_back(line.into());
+        self.thinking.push_back(LogChunk::Plain(line.into()));
+        self.trim_thinking();
+    }
+
+    fn push_thinking_diff(&mut self, unified_diff: impl Into<String>) {
+        self.thinking.push_back(LogChunk::Diff(unified_diff.into()));
+        self.trim_thinking();
+    }
+
+    fn trim_thinking(&mut self) {
         while self.thinking.len() > MAX_THINKING_LINES {
             self.thinking.pop_front();
         }
@@ -352,7 +476,7 @@ fn run_loop(
     let (tx_llm, rx_llm) = std::sync::mpsc::channel::<LlmUiMsg>();
 
     state.push_thinking(
-        "Cantrik REPL — chat = panel utama; log = atas (Shift+PgUp/PgDn menelusuri log); @ #; usulan JSON writes → pratinjau + Y/N di log; Ctrl+C quit."
+        "Cantrik REPL — chat; log (Shift+PgUp/PgDn); diff berwarna; usulan JSON → Y/N; /peek path; @ #; Ctrl+C quit."
             .to_string(),
     );
     if state.mem.is_some() {
@@ -371,7 +495,7 @@ fn run_loop(
                 LlmUiMsg::Chunk(s) => {
                     state.stream_buf.push_str(&s);
                 }
-                LlmUiMsg::Done(Ok(()), assistant_text) => {
+                LlmUiMsg::Done(Ok(()), assistant_text, usage_line) => {
                     state.busy = false;
                     state.stream_buf.clear();
                     state.push_chat_turn(ChatTurn {
@@ -379,6 +503,9 @@ fn run_loop(
                         text: assistant_text.clone(),
                     });
                     state.push_thinking("assistant: stream finished OK.".to_string());
+                    if !usage_line.is_empty() {
+                        state.push_thinking(usage_line);
+                    }
                     if let Some(ref m) = state.mem
                         && let Err(e) = rt.block_on(append_message(
                             &m.pool,
@@ -391,7 +518,7 @@ fn run_loop(
                     }
                     offer_repl_writes_from_model(&cwd, &mut state, &assistant_text);
                 }
-                LlmUiMsg::Done(Err(e), _) => {
+                LlmUiMsg::Done(Err(e), _, _) => {
                     state.busy = false;
                     state.stream_buf.clear();
                     state.push_thinking(format!("assistant error: {e}"));
@@ -613,6 +740,7 @@ fn offer_repl_writes_from_model(cwd: &Path, state: &mut ReplState, assistant_tex
                     .to_string(),
             );
             state.push_thinking(note);
+            push_thinking_failed_writes_excerpt(state, assistant_text);
         }
         return;
     }
@@ -627,11 +755,16 @@ fn offer_repl_writes_from_model(cwd: &Path, state: &mut ReplState, assistant_tex
             Ok(d) => {
                 const CAP: usize = 2400;
                 let body = if d.len() > CAP {
-                    format!("{}\n… ({} bytes total)", &d[..CAP], d.len())
+                    format!(
+                        "{}\n… ({} bytes total)",
+                        truncate_utf8_prefix(&d, CAP),
+                        d.len()
+                    )
                 } else {
                     d
                 };
-                state.push_thinking(format!("--- {} ---\n{}", w.path, body));
+                state.push_thinking(format!("--- {} ---", w.path));
+                state.push_thinking_diff(body);
             }
             Err(e) => state.push_thinking(format!("diff {}: {e}", w.path)),
         }
@@ -649,6 +782,8 @@ fn apply_repl_writes(
 ) {
     for w in writes.writes {
         let rel = Path::new(&w.path);
+        let full = cwd.join(rel);
+        let old = std::fs::read_to_string(&full).unwrap_or_default();
         match tool_write_file(
             config,
             cwd,
@@ -657,7 +792,14 @@ fn apply_repl_writes(
             WriteApproval::user_confirmed_after_reviewing_diff(),
         ) {
             Ok(()) => {
-                state.push_thinking(format!("wrote {}", w.path));
+                let (ins, del) = line_insert_delete_counts(&old, &w.content);
+                state.push_thinking(format!(
+                    "applied {} — +{} / −{} baris; {} bytes",
+                    w.path,
+                    ins,
+                    del,
+                    w.content.len()
+                ));
                 rt.block_on(approval_record::record_if_adaptive(
                     cwd,
                     config,
@@ -669,6 +811,8 @@ fn apply_repl_writes(
             Err(e) => state.push_thinking(format!("write {} failed: {e}", w.path)),
         }
     }
+    // `@` completion caches paths once; new files from Y/N would never appear until rescan.
+    state.path_completion_cache.clear();
 }
 
 fn handle_line(
@@ -710,8 +854,36 @@ fn handle_line(
             SlashCmd::Exit => return Ok(true),
             SlashCmd::Help => {
                 state.push_thinking(
-                    "/cost · /memory · /plan · /agents · /visualize · /doctor · /health · /exit — chat; log Shift+PgUp/PgDn; @ path; # palette",
+                    "/cost · /memory · /plan · /agents · /visualize · /peek · /doctor · /health · /exit — @ path; # palette; log Shift+PgUp/PgDn",
                 );
+            }
+            SlashCmd::Peek(path) => {
+                let raw = path.as_deref().unwrap_or("").trim();
+                if raw.is_empty() {
+                    state.push_thinking(
+                        "/peek rel/path — tampilkan isi file di panel kanan (set [ui] tui_split_pane=true). Contoh: /peek examples/kalkulator.py".to_string(),
+                    );
+                } else {
+                    let rel_s = raw.strip_prefix('@').unwrap_or(raw).trim();
+                    let rel = Path::new(rel_s);
+                    let max = config.memory.max_file_read_bytes.unwrap_or(96_000);
+                    match tool_read_file(config, cwd, rel, max) {
+                        Ok(text) => {
+                            state.preview = format!("(file: {rel_s})\n\n{text}");
+                            state.push_thinking(format!("peek: {rel_s} ({} chars)", text.len()));
+                            if !effective_tui_split_pane(&config.ui) {
+                                const LINES: usize = 36;
+                                let head: String =
+                                    text.lines().take(LINES).collect::<Vec<_>>().join("\n");
+                                let more = text.lines().count().saturating_sub(LINES);
+                                state.push_thinking(format!(
+                                    "(tanpa tui_split_pane — cuplikan {LINES} baris; +{more} baris)\n{head}"
+                                ));
+                            }
+                        }
+                        Err(e) => state.push_thinking(format!("/peek: {e}")),
+                    }
+                }
             }
             SlashCmd::Visualize(tail) => {
                 let kind = visualize_kind_from_tail(tail.as_deref());
@@ -980,7 +1152,13 @@ fn handle_line(
             .await
         };
         let body = acc.lock().map(|g| g.clone()).unwrap_or_default();
-        let _ = tx_done.send(LlmUiMsg::Done(r.map_err(|e: LlmError| e.to_string()), body));
+        let usage =
+            llm::format_repl_turn_estimate(&cfg, Some(&prompt), full_prompt.len(), body.len());
+        let _ = tx_done.send(LlmUiMsg::Done(
+            r.map_err(|e: LlmError| e.to_string()),
+            body,
+            usage,
+        ));
     });
 
     Ok(false)
@@ -1032,6 +1210,11 @@ fn parse_slash(line: &str) -> Option<SlashCmd> {
         } else {
             Some(tail.to_string())
         }),
+        "peek" | "view" | "cat" => SlashCmd::Peek(if tail.is_empty() {
+            None
+        } else {
+            Some(tail.to_string())
+        }),
         "help" | "?" => SlashCmd::Help,
         "exit" | "quit" => SlashCmd::Exit,
         other => SlashCmd::Unknown(other.to_string()),
@@ -1057,7 +1240,7 @@ fn ui(frame: &mut ratatui::Frame, state: &mut ReplState, config: &AppConfig) {
     let [thinking_area, main_area, input_area] = vertical.areas(area);
 
     let think_w = thinking_area.width.saturating_sub(2) as usize;
-    let think_body = thinking_panel_text(&state.thinking, think_w, state.thinking_scroll_older);
+    let think_body = thinking_panel_collect(&state.thinking, think_w, state.thinking_scroll_older);
     let think_block = Block::default()
         .borders(Borders::ALL)
         .title(if state.thinking_scroll_older > 0 {
@@ -1085,7 +1268,6 @@ fn ui(frame: &mut ratatui::Frame, state: &mut ReplState, config: &AppConfig) {
         })
         .border_style(Style::default().fg(BORDER));
     let think_para = Paragraph::new(think_body)
-        .style(Style::default().fg(TEXT))
         .wrap(Wrap { trim: true })
         .block(think_block);
     frame.render_widget(think_para, thinking_area);
@@ -1115,7 +1297,7 @@ fn ui(frame: &mut ratatui::Frame, state: &mut ReplState, config: &AppConfig) {
             .borders(Borders::ALL)
             .title(Line::from(vec![
                 Span::styled(" preview ", Style::default().fg(ACCENT2)),
-                Span::styled("/visualize", Style::default().fg(MUTED)),
+                Span::styled("/peek · /viz", Style::default().fg(MUTED)),
             ]))
             .border_style(Style::default().fg(BORDER));
         let prev_para = Paragraph::new(prev_text)
@@ -1266,5 +1448,13 @@ mod tests {
             parse_slash("/agents do x"),
             Some(SlashCmd::Agents(Some(s))) if s == "do x"
         ));
+        assert!(matches!(parse_slash("/peek"), Some(SlashCmd::Peek(None))));
+        assert!(matches!(
+            parse_slash("/peek src/main  .rs "),
+            Some(SlashCmd::Peek(Some(s))) if s.contains("main")
+        ));
+        assert!(
+            matches!(parse_slash("/cat foo.rs"), Some(SlashCmd::Peek(Some(s))) if s == "foo.rs")
+        );
     }
 }

@@ -25,9 +25,11 @@ jobs:
             os: ubuntu-24.04-arm
             artifact_name: cantrik
             asset_name: cantrik-linux-aarch64
-          # macos-13 removed from GitHub; x86_64 Apple target builds from macos-latest via Rust cross-target.
+          # Intel macOS runner: `lance-linalg` builds AVX512 dist_table with `-march=native`; on Apple Silicon
+          # hosts that produces a broken x86_64 link (undefined `sum_4bit_dist_table_32bytes_batch_avx512`).
+          # See https://github.com/lance-format/lance/issues/6345
           - target: x86_64-apple-darwin
-            os: macos-latest
+            os: macos-15-intel
             artifact_name: cantrik
             asset_name: cantrik-macos-x86_64
           - target: aarch64-apple-darwin

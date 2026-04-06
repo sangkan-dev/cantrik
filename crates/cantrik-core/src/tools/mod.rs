@@ -4,4 +4,6 @@ mod read;
 mod write;
 
 pub use read::{ToolError, read_file_capped};
-pub use write::{WriteApproval, commit_write, diff_for_new_contents, unified_diff};
+pub use write::{
+    WriteApproval, commit_write, diff_for_new_contents, line_insert_delete_counts, unified_diff,
+};

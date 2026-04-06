@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use similar::TextDiff;
+use similar::{ChangeTag, TextDiff};
 
 use super::read::ToolError;
 
@@ -27,6 +27,29 @@ pub fn unified_diff(path: &Path, old_text: &str, new_text: &str) -> String {
 }
 
 /// Prepare diff string by reading current file (empty if missing).
+/// Approximate inserted / deleted **line** counts between two file bodies (for REPL summaries).
+pub fn line_insert_delete_counts(old_text: &str, new_text: &str) -> (usize, usize) {
+    let diff = TextDiff::from_lines(old_text, new_text);
+    let mut ins = 0usize;
+    let mut del = 0usize;
+    for change in diff.iter_all_changes() {
+        let v = change.value();
+        if v.is_empty() {
+            continue;
+        }
+        let n = {
+            let c = v.lines().count();
+            if v.ends_with('\n') { c } else { c.max(1) }
+        };
+        match change.tag() {
+            ChangeTag::Insert => ins += n,
+            ChangeTag::Delete => del += n,
+            ChangeTag::Equal => {}
+        }
+    }
+    (ins, del)
+}
+
 pub fn diff_for_new_contents(path: &Path, new_text: &str) -> Result<String, ToolError> {
     let old = if path.exists() {
         std::fs::read_to_string(path)?
@@ -42,4 +65,15 @@ pub fn commit_write(path: &Path, new_text: &str, _: WriteApproval) -> Result<(),
     }
     std::fs::write(path, new_text)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod line_count_tests {
+    use super::line_insert_delete_counts;
+
+    #[test]
+    fn counts_ins_and_dels() {
+        let (i, d) = line_insert_delete_counts("a\nb\n", "a\nc\n");
+        assert!(i >= 1 && d >= 1, "i={i} d={d}");
+    }
 }

@@ -1,4 +1,4 @@
-# Used by `cross build` (release workflow: aarch64-unknown-linux-gnu).
-# Host-side `apt install protobuf-compiler` does not reach the cross container; lance-encoding needs `protoc`.
+# Optional: local `cross build --target aarch64-unknown-linux-gnu` from an x86_64 machine.
+# Release CI uses a native `ubuntu-24.04-arm` runner instead (no Docker/QEMU).
 [target.aarch64-unknown-linux-gnu]
 pre-build = ["apt-get update && apt-get install -y protobuf-compiler"]

@@ -20,14 +20,14 @@ jobs:
             os: ubuntu-latest
             artifact_name: cantrik
             asset_name: cantrik-linux-x86_64
+          # Native ARM runner (no `cross` / QEMU): avoids GLIBC + build-script arch mixups from emulated builds.
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-24.04-arm
             artifact_name: cantrik
             asset_name: cantrik-linux-aarch64
-            cross: true
-          # Intel runner: avoids linker failures building x86_64 on Apple Silicon hosts.
+          # macos-13 removed from GitHub; x86_64 Apple target builds from macos-latest via Rust cross-target.
           - target: x86_64-apple-darwin
-            os: macos-13
+            os: macos-latest
             artifact_name: cantrik
             asset_name: cantrik-macos-x86_64
           - target: aarch64-apple-darwin
@@ -50,19 +50,13 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install protobuf
 
-      - name: Install cross (Linux aarch64)
-        if: matrix.cross == true
-        run: cargo install cross --git https://github.com/cross-rs/cross
-
       - uses: Swatinem/rust-cache@v2
+        with:
+          # One cache per target — prevents x86_64 host artifacts polluting aarch64 (and vice versa).
+          shared-key: release-${{ matrix.target }}
 
-      - name: Build release (native)
-        if: matrix.cross != true
+      - name: Build release
         run: cargo build --release -p cantrik-cli --target ${{ matrix.target }}
-
-      - name: Build release (cross)
-        if: matrix.cross == true
-        run: cross build --release -p cantrik-cli --target ${{ matrix.target }}
 
       - name: Rename artifact
         run: |

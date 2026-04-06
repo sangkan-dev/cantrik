@@ -1,5 +1,7 @@
 //! Assemble prompt with anchors + summary + tail; optional LLM summarization.
 
+use std::fs;
+use std::io::Read;
 use std::path::Path;
 
 use sqlx::SqlitePool;
@@ -41,6 +43,89 @@ fn tail_messages(app: &AppConfig) -> usize {
         .context_tail_messages
         .map(|n| n as usize)
         .unwrap_or(DEFAULT_TAIL_MESSAGES)
+}
+
+/// Max bytes inlined per `@path` token in REPL (capped; see [`expand_at_path_attachments`]).
+const REPL_ATTACH_PER_FILE_CAP: u64 = 12_000;
+const REPL_ATTACH_MAX_FILES: usize = 8;
+
+/// Collect `@rel/path` tokens from a user line (whitespace-separated words with `@` prefix).
+pub fn extract_at_path_tokens(line: &str) -> Vec<String> {
+    line.split_whitespace()
+        .filter_map(|w| {
+            let s = w.strip_prefix('@')?;
+            if s.is_empty() {
+                return None;
+            }
+            Some(s.to_string())
+        })
+        .collect()
+}
+
+/// Read small file snippets for `@path` references under `cwd` for extra LLM context (REPL).
+pub fn expand_at_path_attachments(cwd: &Path, user_line: &str, app: &AppConfig) -> Option<String> {
+    let rels = extract_at_path_tokens(user_line);
+    if rels.is_empty() {
+        return None;
+    }
+    let cfg_cap = app.memory.max_file_read_bytes.unwrap_or(64_000);
+    let per_cap = (cfg_cap.min(REPL_ATTACH_PER_FILE_CAP)) as usize;
+    let cwd_canon = fs::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    let mut blocks = Vec::new();
+    for rel in rels.into_iter().take(REPL_ATTACH_MAX_FILES) {
+        let joined = cwd.join(&rel);
+        let target = match fs::canonicalize(&joined) {
+            Ok(p) => p,
+            Err(_) => {
+                blocks.push(format!("(@{rel}: not found)\n"));
+                continue;
+            }
+        };
+        if !target.starts_with(&cwd_canon) {
+            blocks.push(format!("(@{rel}: outside project root — skipped)\n"));
+            continue;
+        }
+        let meta = match fs::metadata(&target) {
+            Ok(m) => m,
+            Err(e) => {
+                blocks.push(format!("(@{rel}: {e})\n"));
+                continue;
+            }
+        };
+        if meta.is_dir() {
+            blocks.push(format!("(@{rel}: directory — not inlined)\n"));
+            continue;
+        }
+        let mut f = match fs::File::open(&target) {
+            Ok(f) => f,
+            Err(e) => {
+                blocks.push(format!("(@{rel}: open: {e})\n"));
+                continue;
+            }
+        };
+        let mut buf = vec![0u8; per_cap.saturating_add(1)];
+        let n = match f.read(&mut buf[..per_cap]) {
+            Ok(n) => n,
+            Err(e) => {
+                blocks.push(format!("(@{rel}: read: {e})\n"));
+                continue;
+            }
+        };
+        let truncated = n == per_cap;
+        let text = String::from_utf8_lossy(&buf[..n]);
+        blocks.push(format!(
+            "File `{rel}`:\n```\n{}{}\n```\n",
+            text,
+            if truncated { "\n...[truncated]" } else { "" }
+        ));
+    }
+    if blocks.is_empty() {
+        None
+    } else {
+        let mut s = String::from("Attached context from @-references:\n");
+        s.push_str(&blocks.join("\n"));
+        Some(s)
+    }
 }
 
 fn messages_char_count(msgs: &[MessageEntry]) -> u64 {
@@ -114,6 +199,7 @@ pub async fn build_llm_prompt(
     cwd: &Path,
     app: &AppConfig,
     current_user_line: &str,
+    attachment_preamble: Option<&str>,
 ) -> Result<String, SessionError> {
     let anchors = load_anchors_combined(cwd);
     let sum = latest_summary(pool, session_id).await?;
@@ -176,6 +262,10 @@ pub async fn build_llm_prompt(
         parts.push(hist);
     }
 
+    if let Some(block) = attachment_preamble.filter(|s| !s.is_empty()) {
+        parts.push(block.to_string());
+    }
+
     let mut body = parts.join("\n");
     body.push_str(&format!("\nuser: {current_user_line}\n"));
 
@@ -195,6 +285,15 @@ mod tests {
 
     use super::*;
     use crate::config::{AppConfig, CulturalWisdomLevel};
+
+    #[test]
+    fn extract_at_path_tokens_parses_words() {
+        assert_eq!(
+            extract_at_path_tokens("see @foo/bar @baz"),
+            vec!["foo/bar".to_string(), "baz".to_string()]
+        );
+        assert!(extract_at_path_tokens("no at").is_empty());
+    }
     use crate::session::{connect_pool, open_or_create_session};
     use crate::skills::ENV_NO_RULES;
 
@@ -211,7 +310,7 @@ mod tests {
         let pool = connect_pool().await.expect("pool");
         let sid = open_or_create_session(&pool, &dir).await.expect("session");
         let app = AppConfig::default();
-        let body = build_llm_prompt(&pool, &sid, &dir, &app, "hello")
+        let body = build_llm_prompt(&pool, &sid, &dir, &app, "hello", None)
             .await
             .expect("prompt");
 
@@ -239,7 +338,7 @@ mod tests {
         let sid = open_or_create_session(&pool, &dir).await.expect("session");
         let mut app = AppConfig::default();
         app.ui.cultural_wisdom = Some(CulturalWisdomLevel::Light);
-        let body = build_llm_prompt(&pool, &sid, &dir, &app, "hello")
+        let body = build_llm_prompt(&pool, &sid, &dir, &app, "hello", None)
             .await
             .expect("prompt");
 
@@ -274,7 +373,7 @@ mod tests {
         let mut app = AppConfig::default();
         app.memory.adaptive_begawan = Some(true);
 
-        let body = build_llm_prompt(&pool, &sid, &dir, &app, "hello")
+        let body = build_llm_prompt(&pool, &sid, &dir, &app, "hello", None)
             .await
             .expect("prompt");
 

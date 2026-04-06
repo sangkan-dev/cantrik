@@ -350,6 +350,15 @@ pub enum Command {
     },
     /// Check Cantrik installation, config, and connectivity (expanded over sprints).
     Doctor,
+    /// Interactive wizard to edit Cantrik TOML (global `config.toml` or project `cantrik.toml`).
+    Configure {
+        /// Edit `~/.config/cantrik/config.toml`.
+        #[arg(long)]
+        global: bool,
+        /// Edit `.cantrik/cantrik.toml` in the current project.
+        #[arg(long, conflicts_with = "global")]
+        project: bool,
+    },
     /// Local dev gate: `cargo audit` (or `[intelligence].audit_command`), optional clippy and `cargo test --workspace --lib`, each with a timeout (Sprint 19, PRD §4.14).
     Health {
         /// Always exit 0 (still print failures).

@@ -240,6 +240,9 @@ pub async fn run() -> ExitCode {
             commands::init_cmd::run(&root, template.as_str())
         }
         Some(Command::Doctor) => commands::doctor::run(&cwd),
+        Some(Command::Configure { global, project }) => {
+            commands::configure_cmd::run(&cwd, *global, *project)
+        }
         Some(Command::Health {
             soft,
             no_clippy,
@@ -784,6 +787,26 @@ mod tests {
     fn parse_lsp_subcommand() {
         let cli = Cli::try_parse_from(["cantrik", "lsp"]).expect("parse");
         assert!(matches!(cli.cmd, Some(Command::Lsp)));
+    }
+
+    #[test]
+    fn parse_configure_subcommand() {
+        let cli = Cli::try_parse_from(["cantrik", "configure", "--global"]).expect("parse");
+        assert!(matches!(
+            cli.cmd,
+            Some(Command::Configure {
+                global: true,
+                project: false
+            })
+        ));
+        let cli = Cli::try_parse_from(["cantrik", "configure", "--project"]).expect("parse");
+        assert!(matches!(
+            cli.cmd,
+            Some(Command::Configure {
+                global: false,
+                project: true
+            })
+        ));
     }
 
     #[test]

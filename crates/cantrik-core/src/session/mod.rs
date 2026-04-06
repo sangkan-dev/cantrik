@@ -9,7 +9,9 @@ mod paths;
 pub use adaptive_memory::record_approval_memory;
 
 pub use anchors::load_anchors_combined;
-pub use context::{build_llm_prompt, maybe_summarize_session};
+pub use context::{
+    build_llm_prompt, expand_at_path_attachments, extract_at_path_tokens, maybe_summarize_session,
+};
 pub use db::connect_pool;
 pub use paths::{
     ENV_MEMORY_DB, global_anchors_path, memory_db_path, project_anchors_path, share_dir,

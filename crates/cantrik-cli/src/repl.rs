@@ -1,5 +1,8 @@
 //! Interactive TUI REPL (Sprint 4): ratatui + crossterm, streaming LLM, slash commands.
 
+#[path = "repl_completion.rs"]
+mod repl_completion;
+
 use std::collections::VecDeque;
 use std::io::Result as IoResult;
 use std::path::{Path, PathBuf};
@@ -10,8 +13,9 @@ use cantrik_core::config::{AppConfig, effective_cultural_wisdom, effective_tui_s
 use cantrik_core::cultural_wisdom;
 use cantrik_core::llm::{self, LlmError};
 use cantrik_core::session::{
-    append_message, build_llm_prompt, connect_pool, load_anchors_combined, maybe_summarize_session,
-    memory_db_path, message_count, open_or_create_session, session_project_fingerprint,
+    append_message, build_llm_prompt, connect_pool, expand_at_path_attachments,
+    load_anchors_combined, maybe_summarize_session, memory_db_path, message_count,
+    open_or_create_session, session_project_fingerprint,
 };
 use cantrik_core::usage_ledger::{current_year_month_utc, month_spend_usd, session_spend_usd};
 use cantrik_core::visualize::{self, VisualizeKind};
@@ -26,6 +30,7 @@ use crate::commands::agents_cmd;
 use crate::commands::doctor;
 use crate::commands::health;
 use crate::commands::plan as plan_cmd;
+use repl_completion::{ReplCompletion, new_hash_completion, new_path_completion, sync_completion};
 
 const MAX_THINKING_LINES: usize = 48;
 const MAX_INPUT_HISTORY: usize = 100;
@@ -70,6 +75,10 @@ struct ReplState {
     preview: String,
     busy: bool,
     mem: Option<ReplMemory>,
+    /// `@` / `#` completion (see `repl_completion`).
+    completion: Option<ReplCompletion>,
+    /// Cached paths for `@` completion (per REPL session).
+    path_completion_cache: Vec<String>,
 }
 
 impl ReplState {
@@ -83,6 +92,8 @@ impl ReplState {
             preview: String::new(),
             busy: false,
             mem,
+            completion: None,
+            path_completion_cache: Vec::new(),
         }
     }
 
@@ -119,7 +130,10 @@ fn run_loop(
     let mut state = ReplState::new(mem);
     let (tx_llm, rx_llm) = std::sync::mpsc::channel::<LlmUiMsg>();
 
-    state.push_thinking("Cantrik REPL — /help for commands, Ctrl+C to quit.".to_string());
+    state.push_thinking(
+        "Cantrik REPL — /help for slash commands; @ file path; # command palette; Ctrl+C to quit."
+            .to_string(),
+    );
     if state.mem.is_some() {
         state.push_thinking("Session memory: ON (SQLite).".to_string());
     } else {
@@ -173,14 +187,65 @@ fn run_loop(
 
                     match key.code {
                         KeyCode::Char(c) => {
-                            state.input.push(c);
                             state.hist_cursor = None;
+                            if state.completion.is_none() && c == '@' {
+                                state.input.push(c);
+                                let t = state.input.len().saturating_sub(1);
+                                let mut comp = new_path_completion(
+                                    t,
+                                    cwd.as_path(),
+                                    &mut state.path_completion_cache,
+                                );
+                                comp.refresh_from_input(&state.input);
+                                state.completion = Some(comp);
+                                continue;
+                            }
+                            if state.completion.is_none() && c == '#' {
+                                state.input.push(c);
+                                let t = state.input.len().saturating_sub(1);
+                                let mut comp = new_hash_completion(t);
+                                comp.refresh_from_input(&state.input);
+                                state.completion = Some(comp);
+                                continue;
+                            }
+                            state.input.push(c);
+                            if let Some(comp) = state.completion.take()
+                                && let Some(c2) = sync_completion(&state.input, comp)
+                            {
+                                state.completion = Some(c2);
+                            }
                         }
                         KeyCode::Backspace => {
-                            state.input.pop();
                             state.hist_cursor = None;
+                            state.input.pop();
+                            if let Some(comp) = state.completion.take() {
+                                let still = state.input.as_bytes().get(comp.trigger_pos).copied()
+                                    == Some(match comp.kind {
+                                        repl_completion::CompletionKind::Path => b'@',
+                                        repl_completion::CompletionKind::Hash => b'#',
+                                    })
+                                    && state.input.len() > comp.trigger_pos;
+                                if still && let Some(c2) = sync_completion(&state.input, comp) {
+                                    state.completion = Some(c2);
+                                }
+                            }
                         }
                         KeyCode::Enter => {
+                            if let Some(comp) = state.completion.take() {
+                                if comp.filtered.is_empty() {
+                                    state.completion = None;
+                                    state.hist_cursor = None;
+                                    continue;
+                                }
+                                if comp.apply_to_input(&mut state.input) {
+                                    state.completion = None;
+                                    state.hist_cursor = None;
+                                    continue;
+                                }
+                                state.completion = Some(comp);
+                                state.hist_cursor = None;
+                                continue;
+                            }
                             let line = std::mem::take(&mut state.input);
                             state.hist_cursor = None;
                             if line.trim().is_empty() {
@@ -198,6 +263,12 @@ fn run_loop(
                             }
                         }
                         KeyCode::Up => {
+                            if let Some(ref mut comp) = state.completion {
+                                if !comp.filtered.is_empty() {
+                                    comp.selected = comp.selected.saturating_sub(1);
+                                }
+                                continue;
+                            }
                             if state.input_history.is_empty() {
                                 continue;
                             }
@@ -209,6 +280,13 @@ fn run_loop(
                             }
                         }
                         KeyCode::Down => {
+                            if let Some(ref mut comp) = state.completion {
+                                if !comp.filtered.is_empty() {
+                                    let max = comp.filtered.len() - 1;
+                                    comp.selected = (comp.selected + 1).min(max);
+                                }
+                                continue;
+                            }
                             let Some(idx) = state.hist_cursor else {
                                 continue;
                             };
@@ -221,7 +299,24 @@ fn run_loop(
                                 state.hist_cursor = None;
                             }
                         }
-                        KeyCode::Esc => return Ok(()),
+                        KeyCode::Tab => {
+                            if let Some(ref mut comp) = state.completion
+                                && comp.filtered.len() > 1
+                            {
+                                let max = comp.filtered.len() - 1;
+                                comp.selected = if comp.selected >= max {
+                                    0
+                                } else {
+                                    comp.selected + 1
+                                };
+                            }
+                        }
+                        KeyCode::Esc => {
+                            if state.completion.take().is_some() {
+                                continue;
+                            }
+                            return Ok(());
+                        }
                         _ => {}
                     }
                 }
@@ -250,7 +345,7 @@ fn handle_line(
             SlashCmd::Exit => return Ok(true),
             SlashCmd::Help => {
                 state.push_thinking(
-                    "/cost · /memory · /plan · /agents · /visualize [callgraph|architecture|dependencies] · /doctor · /health · /exit",
+                    "/cost · /memory · /plan · /agents · /visualize [callgraph|architecture|dependencies] · /doctor · /health · /exit — also @ paths and # palette in the input line",
                 );
             }
             SlashCmd::Visualize(tail) => {
@@ -446,7 +541,15 @@ fn handle_line(
             state.busy = false;
             return Ok(false);
         }
-        match rt.block_on(build_llm_prompt(pool, session_id, cwd, config, &prompt)) {
+        let attach = expand_at_path_attachments(cwd, &prompt, config);
+        match rt.block_on(build_llm_prompt(
+            pool,
+            session_id,
+            cwd,
+            config,
+            &prompt,
+            attach.as_deref(),
+        )) {
             Ok(p) => p,
             Err(e) => {
                 state.push_thinking(format!("context build: {e}"));
@@ -455,10 +558,16 @@ fn handle_line(
             }
         }
     } else {
+        let attach = expand_at_path_attachments(cwd, &prompt, config);
         let p = prompt.clone();
-        match cultural_wisdom::prompt_addon(effective_cultural_wisdom(&config.ui)) {
-            Some(cw) => format!("{cw}\n\nuser: {p}\n"),
-            None => p,
+        match (
+            cultural_wisdom::prompt_addon(effective_cultural_wisdom(&config.ui)),
+            attach,
+        ) {
+            (Some(cw), Some(a)) => format!("{cw}\n\n{a}\n\nuser: {p}\n"),
+            (Some(cw), None) => format!("{cw}\n\nuser: {p}\n"),
+            (None, Some(a)) => format!("{a}\n\nuser: {p}\n"),
+            (None, None) => p,
         }
     };
 
@@ -556,10 +665,15 @@ fn parse_slash(line: &str) -> Option<SlashCmd> {
 }
 
 fn ui(frame: &mut ratatui::Frame, state: &ReplState, config: &AppConfig) {
+    let input_h = if state.completion.is_some() {
+        12_u16
+    } else {
+        3
+    };
     let vertical = Layout::vertical([
         Constraint::Length(10),
         Constraint::Min(4),
-        Constraint::Length(3),
+        Constraint::Length(input_h),
     ]);
     let [thinking_area, main_area, input_area] = vertical.areas(frame.area());
 
@@ -613,12 +727,54 @@ fn ui(frame: &mut ratatui::Frame, state: &ReplState, config: &AppConfig) {
     }
 
     let busy = if state.busy { " [busy]" } else { "" };
-    let input_block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" cantrik>{busy} "))
-        .border_style(Style::default().fg(Color::Green));
-    let input_para = Paragraph::new(state.input.as_str()).block(input_block);
-    frame.render_widget(input_para, input_area);
+    let title = if state.completion.is_some() {
+        format!(" cantrik>{busy}  @ path  # palette  Tab/↑↓  Enter apply  Esc cancel ")
+    } else {
+        format!(" cantrik>{busy} ")
+    };
+
+    if let Some(ref comp) = state.completion {
+        let inner = Layout::vertical([Constraint::Length(3), Constraint::Min(1)]);
+        let [inp_rect, list_rect] = inner.areas(input_area);
+        let input_block = Block::default()
+            .borders(Borders::ALL)
+            .title(title.clone())
+            .border_style(Style::default().fg(Color::Green));
+        let input_para = Paragraph::new(state.input.as_str()).block(input_block);
+        frame.render_widget(input_para, inp_rect);
+
+        let items: Vec<ListItem> = comp
+            .filtered
+            .iter()
+            .enumerate()
+            .map(|(i, s): (usize, &String)| {
+                let style = if i == comp.selected {
+                    Style::default().fg(Color::Black).bg(Color::Cyan)
+                } else {
+                    Style::default().fg(Color::DarkGray)
+                };
+                let line = if s.len() > 256 {
+                    format!("{}…", &s[..256])
+                } else {
+                    s.clone()
+                };
+                ListItem::new(ratatui::text::Line::from(line).style(style))
+            })
+            .collect();
+        let list_block = Block::default()
+            .borders(Borders::ALL)
+            .title(" complete ")
+            .border_style(Style::default().fg(Color::DarkGray));
+        let list = List::new(items).block(list_block);
+        frame.render_widget(list, list_rect);
+    } else {
+        let input_block = Block::default()
+            .borders(Borders::ALL)
+            .title(title)
+            .border_style(Style::default().fg(Color::Green));
+        let input_para = Paragraph::new(state.input.as_str()).block(input_block);
+        frame.render_widget(input_para, input_area);
+    }
 }
 
 fn tail_lines(s: &str, max_lines: usize) -> String {

@@ -4,6 +4,7 @@ pub(crate) mod ask;
 pub(crate) mod background_cmd;
 pub(crate) mod collab_cmd;
 pub(crate) mod completions;
+pub(crate) mod configure_cmd;
 pub(crate) mod cost_cmd;
 pub(crate) mod daemon_cmd;
 pub(crate) mod diff_cmd;

@@ -52,11 +52,15 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          # One cache per target — prevents x86_64 host artifacts polluting aarch64 (and vice versa).
-          shared-key: release-${{ matrix.target }}
+          # Per target; `macosx-min11` busts caches built before MACOSX_DEPLOYMENT_TARGET (tree-sitter vs ld).
+          shared-key: release-${{ matrix.target }}-macosx-min11
 
+      # Native C deps (tree-sitter, etc.) otherwise pick the host SDK (~15.x) while the x86_64 Rust
+      # target links with ~10.12 — ld then fails. One minimum macOS for compile + link fixes it.
       - name: Build release
         run: cargo build --release -p cantrik-cli --target ${{ matrix.target }}
+        env:
+          MACOSX_DEPLOYMENT_TARGET: ${{ runner.os == 'macOS' && '11.0' || '' }}
 
       - name: Rename artifact
         run: |

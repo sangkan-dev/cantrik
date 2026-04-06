@@ -25,8 +25,9 @@ jobs:
             artifact_name: cantrik
             asset_name: cantrik-linux-aarch64
             cross: true
+          # Intel runner: avoids linker failures building x86_64 on Apple Silicon hosts.
           - target: x86_64-apple-darwin
-            os: macos-latest
+            os: macos-13
             artifact_name: cantrik
             asset_name: cantrik-macos-x86_64
           - target: aarch64-apple-darwin

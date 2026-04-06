@@ -16,6 +16,7 @@ pub const ENV_RUNSC_BIN: &str = "CANTRIK_RUNSC_BIN";
 /// `CANTRIK_SANDBOX=0` disables sandbox wrapping (developer escape hatch; insecure).
 pub const ENV_DISABLE_SANDBOX: &str = "CANTRIK_SANDBOX";
 
+#[cfg(target_os = "linux")]
 const BWRAP_BIN: &str = "bwrap";
 
 fn sandbox_disabled_by_env() -> bool {
@@ -138,6 +139,7 @@ fn restricted_command(program: &str, argv: &[String], cwd: &OsString) -> Result<
     )
 }
 
+#[cfg(target_os = "linux")]
 fn which_binary(name: &str) -> Option<std::path::PathBuf> {
     std::env::var_os("PATH").and_then(|paths| {
         std::env::split_paths(&paths).find_map(|dir| {

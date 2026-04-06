@@ -1,6 +1,6 @@
 //! Registry dispatch: tier checks, approvals, and tool implementations.
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
@@ -80,22 +80,53 @@ pub fn resolve_path_in_project(
     Ok(p)
 }
 
-/// Target path for a write (file may not exist yet): parent directory must lie under `project_root`.
+/// Target path for a write (file may not exist yet): parent directories are created; path must stay under `project_root`.
+///
+/// Previously this called [`Path::canonicalize`] on parents that did not exist yet, so new folders
+/// like `examples/` or `@examples/` always failed before any write — see REPL model `writes`.
 pub fn resolve_write_target(path: &Path, project_root: &Path) -> Result<PathBuf, ToolSystemError> {
-    let root = project_root.canonicalize()?;
-    let target = if path.is_absolute() {
-        path.to_path_buf()
+    let root = project_root.canonicalize().map_err(ToolSystemError::Io)?;
+
+    let relative: PathBuf = if path.is_absolute() {
+        path.strip_prefix(&root)
+            .map_err(|_| ToolSystemError::PathOutsideProject(path.to_path_buf()))?
+            .into()
     } else {
-        root.join(path)
+        path.into()
     };
-    let parent = target
+
+    let mut cursor = root.clone();
+    for comp in relative.components() {
+        match comp {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if cursor == root {
+                    return Err(ToolSystemError::Policy("path escapes project root".into()));
+                }
+                cursor.pop();
+            }
+            Component::Normal(s) => cursor.push(s),
+            Component::Prefix(_) | Component::RootDir => {
+                return Err(ToolSystemError::Policy(
+                    "invalid path in write target".into(),
+                ));
+            }
+        }
+    }
+
+    if !cursor.starts_with(&root) {
+        return Err(ToolSystemError::PathOutsideProject(cursor));
+    }
+
+    let parent = cursor
         .parent()
         .ok_or_else(|| ToolSystemError::Policy("write path has no parent".into()))?;
-    let parent_canon = parent.canonicalize()?;
+    std::fs::create_dir_all(parent).map_err(ToolSystemError::Io)?;
+    let parent_canon = parent.canonicalize().map_err(ToolSystemError::Io)?;
     if !parent_canon.starts_with(&root) {
         return Err(ToolSystemError::PathOutsideProject(parent_canon));
     }
-    Ok(target)
+    Ok(cursor)
 }
 
 /// Read a file within `project_root` with tier + path checks.
@@ -403,6 +434,34 @@ mod tests {
         let tmp = std::env::temp_dir();
         let err = tool_read_file(&c, tmp.as_path(), Path::new("/etc/passwd"), 1024);
         assert!(matches!(err, Err(ToolSystemError::PathOutsideProject(_))));
+    }
+
+    #[test]
+    fn resolve_write_target_creates_missing_parent_dirs() {
+        let root =
+            std::env::temp_dir().join(format!("cantrik-write-target-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let root = root.canonicalize().unwrap();
+        let nested = Path::new("deep/nested/dir/file.txt");
+        let p = resolve_write_target(nested, &root).unwrap();
+        assert_eq!(p, root.join("deep/nested/dir/file.txt"));
+        assert!(!p.exists());
+        std::fs::write(&p, "x").unwrap();
+        assert!(p.exists());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn resolve_write_target_rejects_lexical_escape() {
+        let root =
+            std::env::temp_dir().join(format!("cantrik-write-escape-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let root = root.canonicalize().unwrap();
+        let err = resolve_write_target(Path::new("../totally_outside_file"), &root).unwrap_err();
+        assert!(matches!(err, ToolSystemError::Policy(_)));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

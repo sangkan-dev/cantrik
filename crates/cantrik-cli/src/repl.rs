@@ -12,7 +12,9 @@ use std::sync::{Arc, Mutex};
 use cantrik_core::config::{AppConfig, effective_cultural_wisdom, effective_tui_split_pane};
 use cantrik_core::cultural_wisdom;
 use cantrik_core::llm::{self, LlmError};
-use cantrik_core::planning::parse_experiment_writes_greedy;
+use cantrik_core::planning::{
+    parse_experiment_writes_failure_hint_after_empty, parse_experiment_writes_greedy,
+};
 use cantrik_core::session::{
     append_message, build_llm_prompt, connect_pool, expand_at_path_attachments,
     load_anchors_combined, maybe_summarize_session, memory_db_path, message_count,
@@ -39,6 +41,21 @@ use repl_completion::{ReplCompletion, new_hash_completion, new_path_completion, 
 
 const MAX_THINKING_LINES: usize = 48;
 const MAX_INPUT_HISTORY: usize = 100;
+/// Log panel: how many newest thinking entries to show before scroll.
+const THINKING_PANEL_ENTRY_WINDOW: usize = 22;
+
+/// Model often mirrors user text like `@examples/foo`; `@` is REPL attachment syntax, not part of the filesystem path.
+fn normalize_model_write_rel_path(path: &str) -> String {
+    let p = path
+        .trim()
+        .replace('\\', "/")
+        .trim_start_matches("./")
+        .to_string();
+    if let Some(rest) = p.strip_prefix('@') {
+        return rest.to_string();
+    }
+    p
+}
 
 /// Terminal palette approximating hub “gold on volcanic / andesite” (truecolor).
 mod repl_palette {
@@ -89,13 +106,21 @@ fn hard_wrap_block(text: &str, width: usize) -> String {
     out
 }
 
-fn thinking_panel_text(thinking: &VecDeque<String>, width: usize) -> String {
+fn thinking_panel_text(
+    thinking: &VecDeque<String>,
+    width: usize,
+    scroll_older_entries: usize,
+) -> String {
     let w = width.max(20);
+    let len = thinking.len();
+    let max_scroll = len.saturating_sub(1);
+    let scroll = scroll_older_entries.min(max_scroll);
+    let end = len.saturating_sub(scroll);
+    let start = end.saturating_sub(THINKING_PANEL_ENTRY_WINDOW);
     thinking
         .iter()
-        .rev()
-        .take(14)
-        .rev()
+        .skip(start)
+        .take(end.saturating_sub(start))
         .map(|entry| hard_wrap_block(entry, w))
         .collect::<Vec<_>>()
         .join("\n---\n")
@@ -126,6 +151,8 @@ You are **Cantrik**, the open-source AI coding agent from the Sangkan ecosystem 
 
 **Capabilities (full CLI; this session is chat-first):** the Cantrik binary includes tools such as `ask`, `file read/write`, `exec`, `git`, `rgrep`, `fetch`, `index` + `search`, `plan`, `agents`, `experiment`, `mcp call`, `session`, `skill`, `macros`, `health`, `review`, `workspace`, `configure`, hooks (Lua/WASM under `.cantrik/plugins/`), project `rules.md` and skills. In REPL you mostly answer in natural language; when the user wants code saved, you may emit JSON with a `writes` array (paths relative to project root) as documented in context.
 
+**JSON `writes` (REPL applies only if valid):** Prefer a single fenced block ```json before the JSON. Each array item is `{"path":"relative/path","content":"..."}` where `content` is ONE string: every newline inside file text must be escaped as `\\n`, and quotes as `\\"`. No trailing commas. **Paths:** relative to project root only — never copy the `@` prefix from user chat (`@examples/foo` in chat means use path `examples/foo` in JSON). If you cannot produce valid JSON, explain instead and suggest using `cantrik` file tools.
+
 **Style:** use short paragraphs, blank lines between ideas, and bullets when listing options. Do not paste enormous unreadable JSON without a one-line summary first."##;
 
 fn prepend_repl_directive(body: String) -> String {
@@ -146,18 +173,36 @@ struct ChatTurn {
     text: String,
 }
 
+fn assistant_line_hides_json_writes_line(line: &str) -> bool {
+    let t = line.trim_start();
+    !t.is_empty()
+        && t.starts_with('{')
+        && t.contains("\"writes\"")
+        && (t.len() > 48 || t.contains("\"path\""))
+}
+
+fn assistant_transcript_hides_json_writes(s: &str) -> bool {
+    s.lines().any(assistant_line_hides_json_writes_line)
+}
+
 /// Hide raw `{"writes":...}` lines in the chat panel (full text stays in DB and for Y/N parse).
 fn soften_assistant_for_chat(s: &str) -> String {
-    let placeholder =
-        "  [usulan ubah file dari model — panel **log** menampilkan diff & konfirmasi Y/N]";
+    if !assistant_transcript_hides_json_writes(s) {
+        return s.to_string();
+    }
+    let placeholder_ok =
+        "  [usulan ubah file — buka panel log untuk pratinjau diff & ketik Y / yes atau N / no]";
+    let placeholder_bad = "  [JSON writes gagal diparsing — tidak ada file diusulkan. Buka panel log untuk pesan error; minta ulang dengan blok ```json yang valid.]";
+    let parsed_ok = !parse_experiment_writes_greedy(s).writes.is_empty();
+    let placeholder = if parsed_ok {
+        placeholder_ok
+    } else {
+        placeholder_bad
+    };
     let mut out: Vec<String> = Vec::new();
     let mut prev_placeholder = false;
     for line in s.lines() {
-        let t = line.trim_start();
-        let hide = !t.is_empty()
-            && t.starts_with('{')
-            && t.contains("\"writes\"")
-            && (t.len() > 48 || t.contains("\"path\""));
+        let hide = assistant_line_hides_json_writes_line(line);
         if hide {
             if !prev_placeholder {
                 out.push(placeholder.to_string());
@@ -221,6 +266,8 @@ struct ReplState {
     path_completion_cache: Vec<String>,
     /// Model JSON `writes` waiting for Y/N (see `parse_experiment_writes_greedy`).
     pending_writes: Option<cantrik_core::planning::ExperimentWrites>,
+    /// Log panel: skip this many newest entries to show older log (Shift+PgUp/PgDn).
+    thinking_scroll_older: usize,
 }
 
 impl ReplState {
@@ -239,6 +286,7 @@ impl ReplState {
             completion_list_state: ListState::default(),
             path_completion_cache: Vec::new(),
             pending_writes: None,
+            thinking_scroll_older: 0,
         }
     }
 
@@ -304,7 +352,7 @@ fn run_loop(
     let (tx_llm, rx_llm) = std::sync::mpsc::channel::<LlmUiMsg>();
 
     state.push_thinking(
-        "Cantrik REPL — panel utama = chat (kamu / Cantrik); atas = log; /help; @ #; JSON writes → Y/N di log; Ctrl+C quit."
+        "Cantrik REPL — chat = panel utama; log = atas (Shift+PgUp/PgDn menelusuri log); @ #; usulan JSON writes → pratinjau + Y/N di log; Ctrl+C quit."
             .to_string(),
     );
     if state.mem.is_some() {
@@ -358,6 +406,26 @@ fn run_loop(
                         && matches!(key.code, KeyCode::Char('c'))
                     {
                         return Ok(());
+                    }
+
+                    // Log scroll even while LLM is streaming (panel otherwise looks "stuck").
+                    if matches!(key.code, KeyCode::PageUp | KeyCode::PageDown)
+                        && key.modifiers.contains(KeyModifiers::SHIFT)
+                        && state.completion.is_none()
+                    {
+                        match key.code {
+                            KeyCode::PageUp => {
+                                let max = state.thinking.len().saturating_sub(1);
+                                state.thinking_scroll_older =
+                                    (state.thinking_scroll_older + 2).min(max);
+                            }
+                            KeyCode::PageDown => {
+                                state.thinking_scroll_older =
+                                    state.thinking_scroll_older.saturating_sub(2);
+                            }
+                            _ => {}
+                        }
+                        continue;
                     }
 
                     if state.busy {
@@ -534,10 +602,21 @@ fn run_loop(
 }
 
 fn offer_repl_writes_from_model(cwd: &Path, state: &mut ReplState, assistant_text: &str) {
-    let parsed = parse_experiment_writes_greedy(assistant_text);
+    let mut parsed = parse_experiment_writes_greedy(assistant_text);
+    for w in &mut parsed.writes {
+        w.path = normalize_model_write_rel_path(&w.path);
+    }
     if parsed.writes.is_empty() {
+        if let Some(note) = parse_experiment_writes_failure_hint_after_empty(assistant_text) {
+            state.push_thinking(
+                "—— usulan file dari model tidak diterapkan (JSON `writes` tidak terbaca) ——"
+                    .to_string(),
+            );
+            state.push_thinking(note);
+        }
         return;
     }
+    state.thinking_scroll_older = 0;
     state.push_thinking(format!(
         "—— {} proposed file(s) from model JSON (diff preview, truncated) ——",
         parsed.writes.len()
@@ -631,7 +710,7 @@ fn handle_line(
             SlashCmd::Exit => return Ok(true),
             SlashCmd::Help => {
                 state.push_thinking(
-                    "/cost · /memory · /plan · /agents · /visualize · /doctor · /health · /exit — chat panel + @ path + # slash palette",
+                    "/cost · /memory · /plan · /agents · /visualize · /doctor · /health · /exit — chat; log Shift+PgUp/PgDn; @ path; # palette",
                 );
             }
             SlashCmd::Visualize(tail) => {
@@ -978,16 +1057,32 @@ fn ui(frame: &mut ratatui::Frame, state: &mut ReplState, config: &AppConfig) {
     let [thinking_area, main_area, input_area] = vertical.areas(area);
 
     let think_w = thinking_area.width.saturating_sub(2) as usize;
-    let think_body = thinking_panel_text(&state.thinking, think_w);
+    let think_body = thinking_panel_text(&state.thinking, think_w, state.thinking_scroll_older);
     let think_block = Block::default()
         .borders(Borders::ALL)
-        .title(Line::from(vec![
-            Span::styled(
-                " log ",
-                Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
-            ),
-            Span::styled("session · proposals · diff", Style::default().fg(MUTED)),
-        ]))
+        .title(if state.thinking_scroll_older > 0 {
+            Line::from(vec![
+                Span::styled(
+                    " log ",
+                    Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(
+                        "Shift+PgDn balik terbaru · scroll ↑{}  ",
+                        state.thinking_scroll_older
+                    ),
+                    Style::default().fg(MUTED),
+                ),
+            ])
+        } else {
+            Line::from(vec![
+                Span::styled(
+                    " log ",
+                    Style::default().fg(GOLD).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("session · Shift+PgUp/PgDn", Style::default().fg(MUTED)),
+            ])
+        })
         .border_style(Style::default().fg(BORDER));
     let think_para = Paragraph::new(think_body)
         .style(Style::default().fg(TEXT))

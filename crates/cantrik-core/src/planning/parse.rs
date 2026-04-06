@@ -199,9 +199,61 @@ pub fn parse_experiment_writes_greedy(raw: &str) -> ExperimentWrites {
     }
 }
 
+/// When [`parse_experiment_writes_greedy`] produced no writes, explains why the model output
+/// still looked like a `writes` payload (invalid JSON, truncation, empty array, etc.).
+///
+/// Call only if `parse_experiment_writes_greedy(raw).writes` is already empty, to avoid an extra scan.
+pub fn parse_experiment_writes_failure_hint_after_empty(raw: &str) -> Option<String> {
+    if !raw.contains("\"writes\"") || !raw.contains('{') {
+        return None;
+    }
+    let slice = match extract_json_object(raw) {
+        Ok(s) => s,
+        Err(_) => {
+            return Some(
+                "Tidak ada objek JSON `{ ... }` utuh — sering karena balasan terpotong atau teks non-JSON \
+                 dicampur sehingga `}` penutup tidak cocok."
+                    .to_string(),
+            );
+        }
+    };
+    match serde_json::from_str::<ExperimentWire>(slice) {
+        Ok(w) if w.writes.is_empty() => Some(
+            "JSON valid, tetapi array `writes` kosong — tidak ada file yang diusulkan.".to_string(),
+        ),
+        Ok(_) => None,
+        Err(e) => Some(format!(
+            "JSON tidak valid di sekitar `writes` (periksa kutip dan escape `\\n` untuk baris baru di dalam `content`): {e}"
+        )),
+    }
+}
+
 #[cfg(test)]
 mod greedy_tests {
     use super::*;
+
+    #[test]
+    fn failure_hint_truncated_object() {
+        let raw = r#"Sure. {"writes":[{"path":"a.py","content":"line1
+broken newline not escaped"}"#;
+        assert!(parse_experiment_writes_greedy(raw).writes.is_empty());
+        let hint = parse_experiment_writes_failure_hint_after_empty(raw);
+        assert!(hint.is_some(), "{hint:?}");
+    }
+
+    #[test]
+    fn failure_hint_empty_writes_array() {
+        let raw = r#"{"writes":[],"rationale":"none"}"#;
+        assert!(parse_experiment_writes_greedy(raw).writes.is_empty());
+        let hint = parse_experiment_writes_failure_hint_after_empty(raw).unwrap();
+        assert!(hint.contains("kosong"), "{hint}");
+    }
+
+    #[test]
+    fn failure_hint_none_when_no_writes_keyword() {
+        let raw = "just chatting";
+        assert!(parse_experiment_writes_failure_hint_after_empty(raw).is_none());
+    }
 
     #[test]
     fn greedy_merges_two_objects_last_path_wins() {
